@@ -41,6 +41,7 @@ namespace market.Models
         public int StockAlertThreshold { get; set; } = 10; // 库存下限
         public string SupplierId { get; set; } // 供货方ID
         public string SupplierName { get; set; } // 供货方名称（显示用）
+        public bool IsActive { get; set; } = true; // 是否启用
         
         /// <summary>
         /// 商品描述

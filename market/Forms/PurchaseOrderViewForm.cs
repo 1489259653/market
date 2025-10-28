@@ -9,7 +9,6 @@ namespace market.Forms
     public partial class PurchaseOrderViewForm : Form
     {
         private readonly PurchaseOrder _order;
-
         public PurchaseOrderViewForm(DatabaseService databaseService, PurchaseOrder order)
         {
             InitializeComponent();
@@ -125,7 +124,7 @@ namespace market.Forms
                 Font = new Font("微软雅黑", 10, FontStyle.Bold) 
             };
 
-            // 商品明细数据网格 - 使用Dock填充剩余空间
+            // 商品明细数据网格 - 只调整垂直位置避免被遮挡
             var dataGridView = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -140,7 +139,7 @@ namespace market.Forms
             var contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 40, 0, 0) // 顶部留出标题的空间
+                Padding = new Padding(0, 180, 0, 40) // 只调整顶部padding（margin top）
             };
             
             panel.Controls.Add(lblItems);
@@ -190,7 +189,7 @@ namespace market.Forms
             // 显示商品明细
             var mainPanel = this.Controls[0] as Panel;
             var itemsPanel = mainPanel.Controls[1] as Panel;
-            // 获取 contentPanel，然后从中获取 DataGridView（contentPanel 只包含 dataGridView）
+            // 获取 contentPanel，然后从中获取 DataGridView（注意：contentPanel 是索引1）
             var contentPanel = itemsPanel.Controls[1] as Panel;
             var dataGridView = contentPanel.Controls[0] as DataGridView;
 
@@ -208,7 +207,7 @@ namespace market.Forms
 
             // 清除并重新添加行
             dataGridView.Rows.Clear();
-            
+            Console.WriteLine($"当前订单物品数量: {_order.Items}");
             // 检查_order.Items集合是否有数据
             if (_order.Items == null || _order.Items.Count == 0)
             {

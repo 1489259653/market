@@ -199,6 +199,68 @@ namespace market.Services
                         Details TEXT
                     )";
 
+                // 创建销售订单表
+                var createSaleOrderTable = @"
+                    CREATE TABLE IF NOT EXISTS SaleOrders (
+                        OrderNumber VARCHAR(50) PRIMARY KEY,
+                        OrderDate DATETIME NOT NULL,
+                        Customer VARCHAR(100) NOT NULL,
+                        OperatorId VARCHAR(50) NOT NULL,
+                        Status INT NOT NULL DEFAULT 0,
+                        TotalAmount DECIMAL(18,2) NOT NULL,
+                        DiscountAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        FinalAmount DECIMAL(18,2) NOT NULL,
+                        ReceivedAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        ChangeAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                        PaymentMethod INT NOT NULL DEFAULT 0,
+                        Notes TEXT,
+                        CreatedAt DATETIME NOT NULL,
+                        FOREIGN KEY (OperatorId) REFERENCES Users(Id)
+                    )";
+
+                // 创建销售订单明细表
+                var createSaleOrderItemsTable = @"
+                    CREATE TABLE IF NOT EXISTS SaleOrderItems (
+                        Id VARCHAR(50) PRIMARY KEY,
+                        OrderNumber VARCHAR(50) NOT NULL,
+                        ProductCode VARCHAR(50) NOT NULL,
+                        ProductName VARCHAR(255) NOT NULL,
+                        Quantity INT NOT NULL,
+                        SalePrice DECIMAL(18,2) NOT NULL,
+                        Amount DECIMAL(18,2) NOT NULL,
+                        OriginalPrice DECIMAL(18,2) NOT NULL,
+                        DiscountRate DECIMAL(5,2) NOT NULL DEFAULT 0,
+                        FOREIGN KEY (OrderNumber) REFERENCES SaleOrders(OrderNumber),
+                        FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode)
+                    )";
+
+                // 创建销售历史表
+                var createSaleHistoryTable = @"
+                    CREATE TABLE IF NOT EXISTS SaleHistory (
+                        Id VARCHAR(50) PRIMARY KEY,
+                        ProductCode VARCHAR(50) NOT NULL,
+                        Quantity INT NOT NULL,
+                        SalePrice DECIMAL(18,2) NOT NULL,
+                        Amount DECIMAL(18,2) NOT NULL,
+                        OrderNumber VARCHAR(50),
+                        SaleDate DATETIME NOT NULL,
+                        OperatorId VARCHAR(50) NOT NULL,
+                        FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode),
+                        FOREIGN KEY (OrderNumber) REFERENCES SaleOrders(OrderNumber),
+                        FOREIGN KEY (OperatorId) REFERENCES Users(Id)
+                    )";
+
+                // 创建商品条形码表
+                var createProductBarcodesTable = @"
+                    CREATE TABLE IF NOT EXISTS ProductBarcodes (
+                        Id VARCHAR(50) PRIMARY KEY,
+                        ProductCode VARCHAR(50) NOT NULL,
+                        Barcode VARCHAR(100) NOT NULL,
+                        CreatedAt DATETIME NOT NULL,
+                        FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode),
+                        UNIQUE KEY unique_barcode (Barcode)
+                    )";
+
                 // 创建商品分类表
                 var createCategoryTable = @"
                     CREATE TABLE IF NOT EXISTS Categories (
@@ -225,6 +287,10 @@ namespace market.Services
                 ExecuteCreateTable(connection, createInventoryHistoryTable, "InventoryHistory");
                 ExecuteCreateTable(connection, createOperationLogTable, "OperationLogs");
                 ExecuteCreateTable(connection, createCategoryTable, "Categories");
+                ExecuteCreateTable(connection, createSaleOrderTable, "SaleOrders");
+                ExecuteCreateTable(connection, createSaleOrderItemsTable, "SaleOrderItems");
+                ExecuteCreateTable(connection, createSaleHistoryTable, "SaleHistory");
+                ExecuteCreateTable(connection, createProductBarcodesTable, "ProductBarcodes");
 
                 // 初始化默认数据
                 InitializeDefaultData(connection);

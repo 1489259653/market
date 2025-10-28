@@ -122,14 +122,21 @@ namespace market.Forms
                 var dtpExpiryDate = mainPanel.Controls[9] as DateTimePicker;
                 var txtNotes = mainPanel.Controls[11] as TextBox;
 
-                // 选择商品
-                foreach (Product product in cmbProduct.Items)
+                // 选择商品 - 使用更安全的方法
+                for (int i = 0; i < cmbProduct.Items.Count; i++)
                 {
-                    if (product.ProductCode == Item.ProductCode)
+                    var product = cmbProduct.Items[i] as Product;
+                    if (product != null && product.ProductCode == Item.ProductCode)
                     {
-                        cmbProduct.SelectedItem = product;
+                        cmbProduct.SelectedIndex = i;
                         break;
                     }
+                }
+                
+                // 如果没找到，设置商品信息
+                if (cmbProduct.SelectedIndex == -1 && !string.IsNullOrEmpty(Item.ProductCode))
+                {
+                    cmbProduct.Text = Item.ProductName;
                 }
 
                 numQuantity.Value = Item.Quantity;
@@ -159,9 +166,37 @@ namespace market.Forms
                 var dtpExpiryDate = mainPanel.Controls[9] as DateTimePicker;
                 var txtNotes = mainPanel.Controls[11] as TextBox;
 
-                var selectedProduct = cmbProduct.SelectedItem as Product;
-
-                if (selectedProduct == null)
+                Product selectedProduct = null;
+                
+                // 检查是否是编辑模式且商品在列表中没有找到的情况
+                if (cmbProduct.SelectedItem is Product product)
+                {
+                    selectedProduct = product;
+                }
+                else if (cmbProduct.SelectedIndex == -1 && !string.IsNullOrEmpty(cmbProduct.Text))
+                {
+                    // 如果商品在列表中没有找到，需要验证商品是否存在
+                    if (_isEditMode)
+                    {
+                        // 在编辑模式下，使用原来的商品信息
+                        selectedProduct = new Product { ProductCode = Item.ProductCode, Name = Item.ProductName };
+                    }
+                    else
+                    {
+                        // 在新建模式下，需要检查商品是否存在
+                        var existingProduct = _productService.GetProductByCode(cmbProduct.Text.Trim());
+                        if (existingProduct != null)
+                        {
+                            selectedProduct = existingProduct;
+                        }
+                        else
+                        {
+                            MessageBox.Show("商品不存在，请输入有效的商品编码或从列表中选择", "验证错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+                }
+                else
                 {
                     MessageBox.Show("请选择有效的商品", "验证错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -209,7 +244,7 @@ namespace market.Forms
             var mainPanel = this.Controls[0] as Panel;
             var cmbProduct = mainPanel.Controls[1] as ComboBox;
 
-            if (cmbProduct.SelectedIndex == -1)
+            if (cmbProduct.SelectedIndex == -1 && string.IsNullOrEmpty(cmbProduct.Text))
             {
                 MessageBox.Show("请选择商品", "验证错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;

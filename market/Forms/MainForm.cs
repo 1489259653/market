@@ -399,7 +399,25 @@ namespace market.Forms
 
         private void ShowSalesCounter()
         {
-            ShowFeatureNotImplemented("销售收银");
+            try
+            {
+                // 检查用户权限
+                if (!_authService.HasPermission("销售收银"))
+                {
+                    MessageBox.Show("您没有权限访问销售收银功能！", "权限不足", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var saleService = new SaleService(_databaseService);
+                var saleForm = new SaleCounterForm(saleService, _authService);
+                saleForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开销售收银失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowReturnManagement()

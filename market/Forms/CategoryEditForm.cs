@@ -153,7 +153,7 @@ namespace market.Forms
                         var parentCategory = _categoryService.GetCategoryById(_category.ParentId);
                         if (parentCategory != null)
                         {
-                            var item = _cmbParent.Items.Cast<ComboBoxItem>().FirstOrDefault(x => x.Value == parentCategory.Id);
+                            var item = _cmbParent.Items.Cast<ComboBoxItem>().FirstOrDefault(x => x.Value != null && parentCategory.Id != null && x.Value.ToString() == parentCategory.Id.ToString());
                             if (item != null)
                             {
                                 _cmbParent.SelectedItem = item;

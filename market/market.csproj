@@ -29,6 +29,7 @@
     <Compile Include="Models\Order.cs" />
     <Compile Include="Models\User.cs" />
     <Compile Include="Models\InventoryHistory.cs" />
+    <Compile Include="Models\Sale.cs" />
     <!-- 服务文件 -->
     <Compile Include="Services\DatabaseService.cs" />
     <Compile Include="Services\AuthService.cs" />
@@ -36,6 +37,7 @@
     <Compile Include="Services\InventoryService.cs" />
     <Compile Include="Services\CategoryService.cs" />
     <Compile Include="Services\PurchaseService.cs" />
+    <Compile Include="Services\SaleService.cs" />
     <Compile Include="Services\TestDataService.cs" />
     <!-- 窗体文件 -->
     <Compile Include="Forms\InventoryForm.cs" />
@@ -53,6 +55,9 @@
     <Compile Include="Forms\PurchaseOrderViewForm.cs" />
     <!-- 供应商管理窗体文件 -->
     <Compile Include="Forms\SupplierEditForm.cs" />
+    <!-- 销售管理窗体文件 -->
+    <Compile Include="Forms\SaleCounterForm.cs" />
+    <Compile Include="Forms\PaymentForm.cs" />
     <!-- 进货服务文件 -->
     <!-- PurchaseService.cs 已在服务文件部分定义，此处不再重复 -->
     <!-- 进货模型文件 -->
@@ -71,6 +76,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Forms\PurchaseOrderViewForm.resx" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>

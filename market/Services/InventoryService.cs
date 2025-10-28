@@ -140,6 +140,16 @@ namespace market.Services
 
                         using (var reader = command.ExecuteReader())
                         {
+                            // 调试：检查返回的列名
+                            var schemaTable = reader.GetSchemaTable();
+                            if (schemaTable != null)
+                            {
+                                foreach (DataRow row in schemaTable.Rows)
+                                {
+                                    Console.WriteLine($"列名: {row["ColumnName"]}");
+                                }
+                            }
+                            
                             while (reader.Read())
                             {
                                 historyList.Add(new InventoryHistory

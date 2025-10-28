@@ -9,7 +9,7 @@ namespace market.Forms
     public partial class ProductEditForm : Form
     {
         private ProductService _productService;
-        private CategoryService _categoryService;
+        // private CategoryService _categoryService; // 已移除，未使用
         private Product _product;
         private bool _isEditMode;
         

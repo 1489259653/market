@@ -157,6 +157,102 @@ namespace market.Services
         }
 
         /// <summary>
+        /// 更新进货单（包括商品明细）
+        /// </summary>
+        /// <param name="order">进货单信息</param>
+        /// <returns>是否成功</returns>
+        public bool UpdatePurchaseOrder(PurchaseOrder order)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        try
+                        {
+                            // 更新进货单主表
+                            string orderQuery = @"
+                                UPDATE PurchaseOrders 
+                                SET OrderDate = @OrderDate, SupplierId = @SupplierId, 
+                                    OperatorId = @OperatorId, Status = @Status, 
+                                    TotalAmount = @TotalAmount, TaxAmount = @TaxAmount, 
+                                    FinalAmount = @FinalAmount, Notes = @Notes,
+                                    UpdatedAt = @UpdatedAt
+                                WHERE OrderNumber = @OrderNumber";
+
+                            using (var orderCommand = new MySqlCommand(orderQuery, connection, transaction))
+                            {
+                                orderCommand.Parameters.AddWithValue("@OrderNumber", order.OrderNumber);
+                                orderCommand.Parameters.AddWithValue("@OrderDate", order.OrderDate);
+                                orderCommand.Parameters.AddWithValue("@SupplierId", order.SupplierId);
+                                orderCommand.Parameters.AddWithValue("@OperatorId", order.OperatorId);
+                                orderCommand.Parameters.AddWithValue("@Status", (int)order.Status);
+                                orderCommand.Parameters.AddWithValue("@TotalAmount", order.TotalAmount);
+                                orderCommand.Parameters.AddWithValue("@TaxAmount", order.TaxAmount);
+                                orderCommand.Parameters.AddWithValue("@FinalAmount", order.FinalAmount);
+                                orderCommand.Parameters.AddWithValue("@Notes", order.Notes ?? string.Empty);
+                                orderCommand.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
+
+                                orderCommand.ExecuteNonQuery();
+                            }
+
+                            // 删除原有的进货明细
+                            string deleteItemsQuery = "DELETE FROM PurchaseOrderItems WHERE OrderNumber = @OrderNumber";
+                            using (var deleteCommand = new MySqlCommand(deleteItemsQuery, connection, transaction))
+                            {
+                                deleteCommand.Parameters.AddWithValue("@OrderNumber", order.OrderNumber);
+                                deleteCommand.ExecuteNonQuery();
+                            }
+
+                            // 插入新的进货明细
+                            foreach (var item in order.Items)
+                            {
+                                string itemQuery = @"
+                                    INSERT INTO PurchaseOrderItems (
+                                        Id, OrderNumber, ProductCode, ProductName,
+                                        Quantity, PurchasePrice, Amount, ExpiryDate, BatchNumber, Notes
+                                    ) VALUES (
+                                        @Id, @OrderNumber, @ProductCode, @ProductName,
+                                        @Quantity, @PurchasePrice, @Amount, @ExpiryDate, @BatchNumber, @Notes
+                                    )";
+
+                                using (var itemCommand = new MySqlCommand(itemQuery, connection, transaction))
+                                {
+                                    itemCommand.Parameters.AddWithValue("@Id", Guid.NewGuid().ToString());
+                                    itemCommand.Parameters.AddWithValue("@OrderNumber", order.OrderNumber);
+                                    itemCommand.Parameters.AddWithValue("@ProductCode", item.ProductCode);
+                                    itemCommand.Parameters.AddWithValue("@ProductName", item.ProductName);
+                                    itemCommand.Parameters.AddWithValue("@Quantity", item.Quantity);
+                                    itemCommand.Parameters.AddWithValue("@PurchasePrice", item.PurchasePrice);
+                                    itemCommand.Parameters.AddWithValue("@Amount", item.Amount);
+                                    itemCommand.Parameters.AddWithValue("@ExpiryDate", item.ExpiryDate.HasValue ? item.ExpiryDate.Value : DBNull.Value);
+                                    itemCommand.Parameters.AddWithValue("@BatchNumber", item.BatchNumber ?? string.Empty);
+                                    itemCommand.Parameters.AddWithValue("@Notes", item.Notes ?? string.Empty);
+
+                                    itemCommand.ExecuteNonQuery();
+                                }
+                            }
+
+                            transaction.Commit();
+                            return true;
+                        }
+                        catch (Exception)
+                        {
+                            transaction.Rollback();
+                            throw;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"更新进货单失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// 检查商品是否存在
         /// </summary>
         /// <param name="productCode">商品编码</param>

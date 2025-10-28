@@ -29,6 +29,9 @@ namespace market.Forms
         private bool _isScanning; // 扫描状态标志
         
         public string ScannedBarcode { get; private set; }
+        
+        // 兼容性属性，与原来的Barcode属性相同
+        public string Barcode { get { return ScannedBarcode; } }
 
         // 模拟的条形码数据（在实际应用中，这里应该通过摄像头实时获取）
         private readonly string[] _sampleBarcodes = {
@@ -311,7 +314,7 @@ namespace market.Forms
                 {
                     bitmap.Dispose();
                 }
-            } catch (Exception ex)
+            } catch (Exception)
             {
                 // 忽略帧处理错误
             }
@@ -349,7 +352,7 @@ namespace market.Forms
                     
                     // 短暂暂停以减少CPU使用率
                     System.Threading.Thread.Sleep(50);
-                } catch (Exception ex)
+                } catch (Exception)
                 {
                     // 忽略扫描过程中的错误
                 }

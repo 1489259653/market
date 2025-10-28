@@ -386,16 +386,53 @@ namespace market.Forms
             {
                 var dgvHistory = (DataGridView)_tabControl.TabPages[2].Controls["_dgvHistory"];
                 var historyList = _inventoryService.GetInventoryHistory(productCode, startDate, endDate, operationType);
-                dgvHistory.DataSource = historyList;
+                
+                // 调试：打印返回的数据列名
+                Console.WriteLine($"返回的数据记录数: {historyList.Count}");
+                if (historyList.Count > 0)
+                {
+                    var firstItem = historyList[0];
+                    Console.WriteLine($"数据模型属性: QuantityChange = {firstItem.QuantityChange}");
+                    Console.WriteLine($"数据模型类型: {firstItem.GetType().Name}");
+                }
+                
+                // 调试：检查DataGridView列配置
+                Console.WriteLine($"DataGridView列数: {dgvHistory.Columns.Count}");
+                foreach (DataGridViewColumn col in dgvHistory.Columns)
+                {
+                    Console.WriteLine($"列名: {col.Name}, DataPropertyName: {col.DataPropertyName}");
+                }
+                
+                // 先清除数据源，再重新绑定
+                dgvHistory.DataSource = null;
+                
+                // 手动为DataGridView添加数据行
+                dgvHistory.Rows.Clear();
+                foreach (var item in historyList)
+                {
+                    dgvHistory.Rows.Add(
+                        item.OperationDate,
+                        item.ProductCode,
+                        item.QuantityChange,
+                        item.OperationType,
+                        item.OperatorId,
+                        item.OrderNumber ?? "-",
+                        item.PurchasePrice
+                    );
+                }
 
                 // 设置数量变动样式
                 foreach (DataGridViewRow row in dgvHistory.Rows)
                 {
-                    var quantityChange = Convert.ToInt32(row.Cells["QuantityChange"].Value);
-                    if (quantityChange > 0)
-                        row.Cells["QuantityChange"].Style.ForeColor = Color.Green;
-                    else if (quantityChange < 0)
-                        row.Cells["QuantityChange"].Style.ForeColor = Color.Red;
+                    // 由于现在是手动添加行数据，我们需要使用列索引而不是列名
+                    var quantityChange = 0;
+                    if (row.Cells.Count > 2 && row.Cells[2].Value != null) // 数量变动列是第3列（索引2）
+                        quantityChange = Convert.ToInt32(row.Cells[2].Value);
+                    
+                    if (quantityChange > 0 && row.Cells.Count > 2)
+                        row.Cells[2].Style.ForeColor = Color.Green;
+                    else if (quantityChange < 0 && row.Cells.Count > 2)
+                        row.Cells[2].Style.ForeColor = Color.Red;
                 }
 
                 _tabControl.TabPages[2].Text = $"库存历史 ({historyList.Count} 条记录)";

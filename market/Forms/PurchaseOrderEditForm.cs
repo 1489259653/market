@@ -60,8 +60,13 @@ namespace market.Forms
 
             this.Controls.Add(mainPanel);
 
-            // 初始化数据
-            InitializeData();
+            // 初始化数据 - 确保所有控件已创建
+            this.Load += (s, e) => 
+            {
+                InitializeData();
+                // 窗体加载完成后刷新一次数据网格
+                RefreshItemsGrid();
+            };
         }
 
         private Panel CreateBasicInfoPanel()
@@ -135,11 +140,11 @@ namespace market.Forms
             // 商品明细标题
             var lblItems = new Label { Text = "商品明细", Location = new Point(10, 10), Font = new Font("微软雅黑", 10, FontStyle.Bold) };
 
-            // 商品明细数据网格 - 使用Dock填充剩余空间
+            // 商品明细数据网格 - 只调整垂直位置避免被遮挡
             var dataGridView = new DataGridView
             {
-                Location = new Point(10, 40),
-                Dock = DockStyle.Fill,
+                Location = new Point(10, 50),  // 只调整垂直位置（增加margin top）
+                Dock = DockStyle.Fill,          // 保持填充布局
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 ReadOnly = true,
@@ -174,15 +179,10 @@ namespace market.Forms
             var contentPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 0, 0, 40) // 底部留出按钮面板的空间
+                Padding = new Padding(0, 85, 0, 50) // 只调整垂直方向的padding（顶部40，底部50）
             };
             
             contentPanel.Controls.Add(lblItems);
-            
-            // 调整DataGridView的位置和大小
-            dataGridView.Location = new Point(10, 40);
-            dataGridView.Size = new Size(contentPanel.Width - 20, contentPanel.Height - 50);
-            
             contentPanel.Controls.Add(dataGridView);
 
             // 将所有面板添加到主面板
@@ -371,9 +371,46 @@ namespace market.Forms
             // 检查_items集合是否有数据
             if (_items.Count == 0)
             {
-                // 测试添加一行示例数据
-                dataGridView.Rows.Add("TEST001", "测试商品", 10, 50.5m, 505.0m, "BATCH001", "2024-12-31");
-                MessageBox.Show("当前没有物品数据，已添加测试数据", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // 如果_items为空，但_order.Items有数据，说明数据未正确传递
+                if (_order != null && _order.Items != null && _order.Items.Count > 0)
+                {
+                    // 从_order.Items加载数据到_items
+                    foreach (var item in _order.Items)
+                    {
+                        _items.Add(new PurchaseOrderItem
+                        {
+                            Id = item.Id,
+                            OrderNumber = item.OrderNumber,
+                            ProductCode = item.ProductCode,
+                            ProductName = item.ProductName,
+                            Quantity = item.Quantity,
+                            PurchasePrice = item.PurchasePrice,
+                            Amount = item.Amount,
+                            BatchNumber = item.BatchNumber,
+                            ExpiryDate = item.ExpiryDate,
+                            Notes = item.Notes
+                        });
+                    }
+                    
+                    // 重新显示数据
+                    foreach (var item in _items)
+                    {
+                        dataGridView.Rows.Add(
+                            item.ProductCode,
+                            item.ProductName,
+                            item.Quantity,
+                            item.PurchasePrice,
+                            item.Amount,
+                            item.BatchNumber ?? "-",
+                            item.ExpiryDate.HasValue ? item.ExpiryDate.Value.ToString("yyyy-MM-dd") : "-"
+                        );
+                    }
+                }
+                else
+                {
+                    // 空数据时只显示空表格，不添加测试数据
+                    // 避免干扰真实数据操作
+                }
             }
             else
             {
@@ -421,8 +458,8 @@ namespace market.Forms
 
                 if (_isEditMode)
                 {
-                    // 更新现有订单
-                    if (_purchaseService.UpdatePurchaseOrderStatus(order.OrderNumber, PurchaseOrderStatus.Pending, _authService.CurrentUser.Id))
+                    // 更新现有订单 - 需要完全更新订单信息，包括商品明细
+                    if (_purchaseService.UpdatePurchaseOrder(order))
                     {
                         MessageBox.Show("保存成功", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         this.DialogResult = DialogResult.OK;
