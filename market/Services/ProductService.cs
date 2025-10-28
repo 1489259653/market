@@ -493,6 +493,190 @@ namespace market.Services
             return suppliers;
         }
 
+        /// <summary>
+        /// 根据ID获取供应商
+        /// </summary>
+        public Supplier GetSupplierById(string id)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    string query = "SELECT * FROM Suppliers WHERE Id = @Id";
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                return new Supplier
+                                {
+                                    Id = reader.GetString(reader.GetOrdinal("Id")),
+                                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                                    ProductionLocation = reader.IsDBNull(reader.GetOrdinal("ProductionLocation")) ? "" : reader.GetString(reader.GetOrdinal("ProductionLocation")),
+                                    ContactInfo = reader.IsDBNull(reader.GetOrdinal("Contact")) ? "" : reader.GetString(reader.GetOrdinal("Contact")),
+                                    BusinessLicense = reader.IsDBNull(reader.GetOrdinal("BusinessLicense")) ? "" : reader.GetString(reader.GetOrdinal("BusinessLicense"))
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"获取供应商信息失败: {ex.Message}", ex);
+            }
+            
+            return null;
+        }
+
+        /// <summary>
+        /// 创建供应商
+        /// </summary>
+        public bool CreateSupplier(Supplier supplier)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    string query = @"INSERT INTO Suppliers (Id, Name, ProductionLocation, Contact, Phone, Email, BusinessLicense) 
+                                    VALUES (@Id, @Name, @ProductionLocation, @Contact, @Phone, @Email, @BusinessLicense)";
+                    
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", supplier.Id ?? Guid.NewGuid().ToString());
+                        command.Parameters.AddWithValue("@Name", supplier.Name);
+                        command.Parameters.AddWithValue("@ProductionLocation", string.IsNullOrEmpty(supplier.ProductionLocation) ? DBNull.Value : (object)supplier.ProductionLocation);
+                        
+                        // 解析联系方式
+                        var contactInfo = ParseContactInfo(supplier.ContactInfo);
+                        command.Parameters.AddWithValue("@Contact", contactInfo.Contact);
+                        command.Parameters.AddWithValue("@Phone", contactInfo.Phone);
+                        command.Parameters.AddWithValue("@Email", contactInfo.Email);
+                        
+                        command.Parameters.AddWithValue("@BusinessLicense", string.IsNullOrEmpty(supplier.BusinessLicense) ? DBNull.Value : (object)supplier.BusinessLicense);
+                        
+                        return command.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"创建供应商失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 更新供应商
+        /// </summary>
+        public bool UpdateSupplier(Supplier supplier)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    string query = @"UPDATE Suppliers SET 
+                                    Name = @Name, 
+                                    ProductionLocation = @ProductionLocation, 
+                                    Contact = @Contact, 
+                                    Phone = @Phone, 
+                                    Email = @Email, 
+                                    BusinessLicense = @BusinessLicense 
+                                    WHERE Id = @Id";
+                    
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", supplier.Id);
+                        command.Parameters.AddWithValue("@Name", supplier.Name);
+                        command.Parameters.AddWithValue("@ProductionLocation", string.IsNullOrEmpty(supplier.ProductionLocation) ? DBNull.Value : (object)supplier.ProductionLocation);
+                        
+                        // 解析联系方式
+                        var contactInfo = ParseContactInfo(supplier.ContactInfo);
+                        command.Parameters.AddWithValue("@Contact", contactInfo.Contact);
+                        command.Parameters.AddWithValue("@Phone", contactInfo.Phone);
+                        command.Parameters.AddWithValue("@Email", contactInfo.Email);
+                        
+                        command.Parameters.AddWithValue("@BusinessLicense", string.IsNullOrEmpty(supplier.BusinessLicense) ? DBNull.Value : (object)supplier.BusinessLicense);
+                        
+                        return command.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"更新供应商失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 删除供应商
+        /// </summary>
+        public bool DeleteSupplier(string id)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    
+                    // 检查是否有商品使用此供应商
+                    string checkQuery = "SELECT COUNT(*) FROM Products WHERE SupplierId = @SupplierId";
+                    using (var checkCommand = new MySqlCommand(checkQuery, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@SupplierId", id);
+                        var productCount = Convert.ToInt32(checkCommand.ExecuteScalar());
+                        
+                        if (productCount > 0)
+                        {
+                            throw new Exception("该供应商已被商品使用，无法删除");
+                        }
+                    }
+                    
+                    string deleteQuery = "DELETE FROM Suppliers WHERE Id = @Id";
+                    using (var command = new MySqlCommand(deleteQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("@Id", id);
+                        return command.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"删除供应商失败: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 解析联系方式
+        /// </summary>
+        private (string Contact, string Phone, string Email) ParseContactInfo(string contactInfo)
+        {
+            if (string.IsNullOrEmpty(contactInfo))
+                return ("", "", "");
+
+            // 简单的解析逻辑，可以根据实际需求调整
+            var parts = contactInfo.Split(' ');
+            var contact = "";
+            var phone = "";
+            var email = "";
+
+            foreach (var part in parts)
+            {
+                if (part.Contains("@"))
+                    email = part;
+                else if (part.Any(char.IsDigit) && part.Length >= 7)
+                    phone = part;
+                else
+                    contact = part;
+            }
+
+            return (contact, phone, email);
+        }
+
         // 注意：ProductListResult类已在Product模型中定义，这里不再重复定义
         
         public ProductListResult GetProductsPaged(string keyword, string category, int page, int pageSize)

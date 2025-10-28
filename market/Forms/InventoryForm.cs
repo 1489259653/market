@@ -37,8 +37,8 @@ namespace market.Forms
                 Name = "_tabControl"
             };
             
-            // 添加4个选项卡
-            for (int i = 0; i < 4; i++)
+            // 添加5个选项卡
+            for (int i = 0; i < 5; i++)
             {
                 _tabControl.TabPages.Add(new TabPage());
             }
@@ -99,6 +99,10 @@ namespace market.Forms
             // 库存统计选项卡
             _tabControl.TabPages[3].Text = "库存统计";
             SetupCategoryStockTab();
+
+            // 供应商管理选项卡
+            _tabControl.TabPages[4].Text = "供应商管理";
+            SetupSupplierManagementTab();
         }
 
         #region 库存查询功能
@@ -109,7 +113,7 @@ namespace market.Forms
             var searchPanel = new Panel { Dock = DockStyle.Top, Height = 80, Margin = new Padding(10) };
 
             var label1 = new Label { Text = "搜索条件:", Location = new Point(10, 10), AutoSize = true };
-            var txtSearch = new TextBox { Name = "_txtSearch", Location = new Point(80, 8), Width = 150, PlaceholderText = "商品名称或编码" };
+            var txtSearch = new TextBox { Name = "_txtSearch", Location = new Point(80, 8), Width = 150 };
             var cmbCategory = new ComboBox { Name = "_cmbCategory", Location = new Point(240, 8), Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
             var btnSearch = new Button { Text = "搜索", Location = new Point(370, 8), Width = 60 };
             var btnRefresh = new Button { Text = "刷新", Location = new Point(440, 8), Width = 60 };
@@ -137,10 +141,14 @@ namespace market.Forms
                 new DataGridViewTextBoxColumn { DataPropertyName = "Quantity", HeaderText = "库存数量", Width = 80 },
                 new DataGridViewTextBoxColumn { DataPropertyName = "Unit", HeaderText = "单位", Width = 60 },
                 new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "单价", Width = 80, DefaultCellStyle = { Format = "F2" } },
-                new DataGridViewTextBoxColumn { DataPropertyName = "StockAlertThreshold", HeaderText = "预警阈值", Width = 80 },
-                new DataGridViewTextBoxColumn { DataPropertyName = "StockStatusText", HeaderText = "库存状态", Width = 100 },
-                new DataGridViewTextBoxColumn { DataPropertyName = "ExpiryStatusText", HeaderText = "过期状态", Width = 120 }
+                new DataGridViewTextBoxColumn { DataPropertyName = "StockAlertThreshold", HeaderText = "预警阈值", Width = 80 }
             });
+
+            // 手动添加计算属性的列
+            var stockStatusColumn = new DataGridViewTextBoxColumn { HeaderText = "库存状态", Width = 100 };
+            var expiryStatusColumn = new DataGridViewTextBoxColumn { HeaderText = "过期状态", Width = 120 };
+            dgvInventory.Columns.Add(stockStatusColumn);
+            dgvInventory.Columns.Add(expiryStatusColumn);
 
             // 添加到选项卡
             _tabControl.TabPages[0].Controls.Add(dgvInventory);
@@ -188,30 +196,41 @@ namespace market.Forms
                     filteredProducts = filteredProducts.Where(p => !p.IsExpired).ToList();
                 }
 
-                dgvInventory.DataSource = filteredProducts;
-
-                // 设置单元格样式
-                foreach (DataGridViewRow row in dgvInventory.Rows)
+                // 手动填充数据到DataGridView
+                dgvInventory.Rows.Clear();
+                foreach (var product in filteredProducts)
                 {
-                    var product = row.DataBoundItem as Product;
-                    if (product != null)
-                    {
-                        // 库存状态样式
-                        if (product.AlertLevel == StockAlertLevel.OutOfStock)
-                            row.DefaultCellStyle.BackColor = Color.LightSalmon;
-                        else if (product.AlertLevel == StockAlertLevel.Critical)
-                            row.DefaultCellStyle.BackColor = Color.LemonChiffon;
+                    var rowIndex = dgvInventory.Rows.Add(
+                        product.ProductCode,
+                        product.Name,
+                        product.Category,
+                        product.Quantity,
+                        product.Unit,
+                        product.Price,
+                        product.StockAlertThreshold
+                    );
+                    
+                    var row = dgvInventory.Rows[rowIndex];
+                    
+                    // 手动设置计算属性列的值
+                    row.Cells[7].Value = product.StockStatusText; // 库存状态
+                    row.Cells[8].Value = product.ExpiryStatusText; // 过期状态
 
-                        // 过期样式
-                        if (product.IsExpired)
-                        {
-                            row.Cells["ExpiryStatusText"].Style.ForeColor = Color.Red;
-                            row.Cells["ExpiryStatusText"].Style.Font = new Font(dgvInventory.Font, FontStyle.Bold);
-                        }
-                        else if (product.IsExpiringSoon)
-                        {
-                            row.Cells["ExpiryStatusText"].Style.ForeColor = Color.Orange;
-                        }
+                    // 库存状态样式
+                    if (product.AlertLevel == StockAlertLevel.OutOfStock)
+                        row.DefaultCellStyle.BackColor = Color.LightSalmon;
+                    else if (product.AlertLevel == StockAlertLevel.Critical)
+                        row.DefaultCellStyle.BackColor = Color.LemonChiffon;
+
+                    // 过期样式
+                    if (product.IsExpired)
+                    {
+                        row.Cells[8].Style.ForeColor = Color.Red;
+                        row.Cells[8].Style.Font = new Font(dgvInventory.Font, FontStyle.Bold);
+                    }
+                    else if (product.IsExpiringSoon)
+                    {
+                        row.Cells[8].Style.ForeColor = Color.Orange;
                     }
                 }
 
@@ -436,6 +455,223 @@ namespace market.Forms
 
         #endregion
 
+        #region 供应商管理功能
+
+        private void SetupSupplierManagementTab()
+        {
+            // 顶部操作面板
+            var operationPanel = new Panel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(10) };
+
+            var btnAddSupplier = new Button { Text = "新增供应商", Location = new Point(10, 10), Size = new Size(100, 30) };
+            var btnEditSupplier = new Button { Text = "编辑", Location = new Point(120, 10), Size = new Size(60, 30) };
+            var btnDeleteSupplier = new Button { Text = "删除", Location = new Point(190, 10), Size = new Size(60, 30) };
+            var btnRefreshSuppliers = new Button { Text = "刷新", Location = new Point(260, 10), Size = new Size(60, 30) };
+
+            // 搜索面板
+            var searchPanel = new Panel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(10) };
+            
+            var lblSearch = new Label { Text = "搜索:", Location = new Point(10, 10), AutoSize = true };
+            var txtSearchSupplier = new TextBox { Name = "_txtSearchSupplier", Location = new Point(50, 7), Width = 200 };
+            var btnSearchSupplier = new Button { Text = "搜索", Location = new Point(260, 7), Size = new Size(60, 25) };
+
+            searchPanel.Controls.AddRange(new Control[] { lblSearch, txtSearchSupplier, btnSearchSupplier });
+
+            // 数据表格
+            var dgvSuppliers = new DataGridView
+            {
+                Name = "_dgvSuppliers",
+                Dock = DockStyle.Fill,
+                AutoGenerateColumns = false,
+                AllowUserToAddRows = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false
+            };
+
+            dgvSuppliers.Columns.AddRange(new DataGridViewColumn[]
+            {
+                new DataGridViewTextBoxColumn { Name = "Id", HeaderText = "供应商ID", Width = 100 },
+                new DataGridViewTextBoxColumn { Name = "Name", HeaderText = "供应商名称", Width = 150 },
+                new DataGridViewTextBoxColumn { Name = "ProductionLocation", HeaderText = "生产地", Width = 120 },
+                new DataGridViewTextBoxColumn { Name = "ContactInfo", HeaderText = "联系方式", Width = 200 },
+                new DataGridViewTextBoxColumn { Name = "BusinessLicense", HeaderText = "营业执照", Width = 120 }
+            });
+
+            operationPanel.Controls.AddRange(new Control[] { btnAddSupplier, btnEditSupplier, btnDeleteSupplier, btnRefreshSuppliers });
+
+            _tabControl.TabPages[4].Controls.Add(dgvSuppliers);
+            _tabControl.TabPages[4].Controls.Add(searchPanel);
+            _tabControl.TabPages[4].Controls.Add(operationPanel);
+
+            // 事件处理
+            btnAddSupplier.Click += (s, e) => AddSupplier();
+            btnEditSupplier.Click += (s, e) => EditSupplier();
+            btnDeleteSupplier.Click += (s, e) => DeleteSupplier();
+            btnRefreshSuppliers.Click += (s, e) => LoadSuppliers();
+            btnSearchSupplier.Click += (s, e) => LoadSuppliers(txtSearchSupplier.Text);
+
+            // 双击行编辑
+            dgvSuppliers.CellDoubleClick += (s, e) => EditSupplier();
+        }
+
+        private void LoadSuppliers(string searchKeyword = "")
+        {
+            try
+            {
+                var dgvSuppliers = (DataGridView)_tabControl.TabPages[4].Controls["_dgvSuppliers"];
+                var suppliers = _productService.GetAllSuppliers();
+
+                // 应用搜索条件
+                if (!string.IsNullOrEmpty(searchKeyword))
+                {
+                    suppliers = suppliers.Where(s => 
+                        s.Name.Contains(searchKeyword) || 
+                        s.ProductionLocation.Contains(searchKeyword) ||
+                        s.ContactInfo.Contains(searchKeyword)).ToList();
+                }
+
+                // 手动填充数据到DataGridView
+                dgvSuppliers.Rows.Clear();
+                foreach (var supplier in suppliers)
+                {
+                    var rowIndex = dgvSuppliers.Rows.Add(
+                        supplier.Id,
+                        supplier.Name,
+                        supplier.ProductionLocation ?? "",
+                        supplier.ContactInfo ?? "",
+                        supplier.BusinessLicense ?? ""
+                    );
+                }
+
+                _tabControl.TabPages[4].Text = $"供应商管理 ({suppliers.Count} 个供应商)";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"加载供应商列表失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void AddSupplier()
+        {
+            try
+            {
+                var supplierForm = new SupplierEditForm();
+                if (supplierForm.ShowDialog() == DialogResult.OK)
+                {
+                    var supplier = new Supplier
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Name = supplierForm.SupplierName,
+                        ProductionLocation = supplierForm.ProductionLocation,
+                        ContactInfo = supplierForm.ContactInfo,
+                        BusinessLicense = supplierForm.BusinessLicense
+                    };
+
+                    if (_productService.CreateSupplier(supplier))
+                    {
+                        MessageBox.Show("供应商创建成功", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        LoadSuppliers();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"创建供应商失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void EditSupplier()
+        {
+            try
+            {
+                var dgvSuppliers = (DataGridView)_tabControl.TabPages[4].Controls["_dgvSuppliers"];
+                
+                if (dgvSuppliers.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("请选择一个供应商进行编辑", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var selectedRow = dgvSuppliers.SelectedRows[0];
+                
+                // 由于是手动填充数据，Id列的值应该在第一个单元格（索引0）
+                var supplierId = selectedRow.Cells[0].Value?.ToString();
+                
+                if (string.IsNullOrEmpty(supplierId))
+                {
+                    MessageBox.Show("无法获取供应商ID", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var supplier = _productService.GetSupplierById(supplierId);
+
+                if (supplier == null)
+                {
+                    MessageBox.Show("未找到选中的供应商", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var supplierForm = new SupplierEditForm(supplier);
+                if (supplierForm.ShowDialog() == DialogResult.OK)
+                {
+                    supplier.Name = supplierForm.SupplierName;
+                    supplier.ProductionLocation = supplierForm.ProductionLocation;
+                    supplier.ContactInfo = supplierForm.ContactInfo;
+                    supplier.BusinessLicense = supplierForm.BusinessLicense;
+
+                    if (_productService.UpdateSupplier(supplier))
+                    {
+                        MessageBox.Show("供应商更新成功", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        LoadSuppliers();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"编辑供应商失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void DeleteSupplier()
+        {
+            try
+            {
+                var dgvSuppliers = (DataGridView)_tabControl.TabPages[4].Controls["_dgvSuppliers"];
+                
+                if (dgvSuppliers.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("请选择一个供应商进行删除", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                var selectedRow = dgvSuppliers.SelectedRows[0];
+                
+                // 由于是手动填充数据，Id列的值在第一个单元格（索引0），Name在第二个单元格（索引1）
+                var supplierId = selectedRow.Cells[0].Value?.ToString();
+                var supplierName = selectedRow.Cells[1].Value?.ToString();
+                
+                if (string.IsNullOrEmpty(supplierId) || string.IsNullOrEmpty(supplierName))
+                {
+                    MessageBox.Show("无法获取供应商信息", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                if (MessageBox.Show($"确定要删除供应商 '{supplierName}' 吗？", "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    if (_productService.DeleteSupplier(supplierId))
+                    {
+                        MessageBox.Show("供应商删除成功", "成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        LoadSuppliers();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"删除供应商失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// 选项卡切换时重新加载数据
         /// </summary>
@@ -454,6 +690,9 @@ namespace market.Forms
                     break;
                 case 3: // 库存统计
                     LoadCategoryStockSummary();
+                    break;
+                case 4: // 供应商管理
+                    LoadSuppliers();
                     break;
             }
         }

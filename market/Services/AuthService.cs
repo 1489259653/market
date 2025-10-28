@@ -107,7 +107,7 @@ namespace market.Services
                 case UserRole.WarehouseManager:
                     return operation switch
                     {
-                        "进货" or "库存管理" or "库存预警查看" => true,
+                        "进货" or "库存管理" or "库存预警查看" or "进货管理" or "供应商管理" => true,
                         _ => false
                     };
                 default:

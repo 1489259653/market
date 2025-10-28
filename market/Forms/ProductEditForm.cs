@@ -8,9 +8,10 @@ namespace market.Forms
 {
     public partial class ProductEditForm : Form
     {
-        private readonly ProductService _productService;
-        private readonly Product _product;
-        private readonly bool _isEditMode;
+        private ProductService _productService;
+        private CategoryService _categoryService;
+        private Product _product;
+        private bool _isEditMode;
         
         // UI控件
         private TextBox _txtProductCode;
@@ -22,6 +23,7 @@ namespace market.Forms
         private DateTimePicker _dtpExpiryDate;
         private TextBox _txtStockAlertThreshold;
         private ComboBox _cmbSupplier;
+        private Button _btnScanBarcode;
         private Button _btnSave;
         private Button _btnCancel;
         private CheckBox _chkHasExpiryDate;
@@ -70,10 +72,24 @@ namespace market.Forms
             _txtProductCode = new TextBox
             {
                 Location = new Point(120, y),
-                Size = new Size(controlWidth, controlHeight),
+                Size = new Size(controlWidth - 40, controlHeight),
                 ReadOnly = _isEditMode
             };
-            y += verticalSpacing;
+            
+            // 扫描按钮
+            _btnScanBarcode = new Button
+            {
+                Text = "扫描",
+                Location = new Point(120 + controlWidth - 60, y - verticalSpacing),
+                Size = new Size(55, controlHeight),
+                BackColor = Color.LightBlue,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("微软雅黑", 9)
+            };
+            // 设置图标（如果支持SVG显示）
+            // 在实际应用中，可以使用Image控件加载SVG并设置为按钮背景或使用专门的SVG控件
+            _btnScanBarcode.Click += BtnScanBarcode_Click;
+            mainPanel.Controls.Add(_btnScanBarcode);
 
             // 商品名称
             var lblName = new Label
@@ -228,8 +244,7 @@ namespace market.Forms
             buttonPanel.Controls.Add(_btnCancel);
 
             // 添加控件到主面板
-            mainPanel.Controls.AddRange(new Control[] {
-                lblProductCode, _txtProductCode,
+            mainPanel.Controls.AddRange(new Control[] {lblProductCode, _txtProductCode,
                 lblName, _txtName,
                 lblPrice, _txtPrice,
                 lblQuantity, _txtQuantity,
@@ -246,6 +261,56 @@ namespace market.Forms
 
             // 绑定事件
             BindEvents();
+        }
+
+        private void BtnScanBarcode_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // 由于BarcodeScannerForm类在同一个命名空间中，我们可以直接使用
+                using (var scannerForm = new BarcodeScannerForm())
+                {
+                    if (scannerForm.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(scannerForm.ScannedBarcode))
+                    {
+                        _txtProductCode.Text = scannerForm.ScannedBarcode;
+                        
+                        // 尝试根据条形码获取商品信息（如果系统中已有）
+                        var existingProduct = _productService.GetProductByCode(scannerForm.ScannedBarcode);
+                        if (existingProduct != null && !_isEditMode)
+                        {
+                            _txtName.Text = existingProduct.Name;
+                            _txtPrice.Text = existingProduct.Price.ToString("F2");
+                            _txtUnit.Text = existingProduct.Unit;
+                            _cmbCategory.Text = existingProduct.Category;
+                            _txtStockAlertThreshold.Text = existingProduct.StockAlertThreshold.ToString();
+                            
+                            if (existingProduct.ExpiryDate.HasValue)
+                            {
+                                _chkHasExpiryDate.Checked = true;
+                                _dtpExpiryDate.Enabled = true;
+                            }
+                            
+                            // 自动选择供应商
+                            if (!string.IsNullOrEmpty(existingProduct.SupplierId))
+                            {
+                                for (int i = 0; i < _cmbSupplier.Items.Count; i++)
+                                {
+                                    var itemParts = _cmbSupplier.Items[i].ToString().Split('-');
+                                    if (itemParts.Length > 1 && itemParts[0].Trim() == existingProduct.SupplierId)
+                                    {
+                                        _cmbSupplier.SelectedIndex = i;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"条形码扫描失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void SetupForm()
@@ -289,6 +354,9 @@ namespace market.Forms
             {
                 _dtpExpiryDate.Enabled = _chkHasExpiryDate.Checked;
             };
+
+            // 扫描按钮事件
+            _btnScanBarcode.Click += (s, e) => ScanBarcode();
 
             // 回车键保存
             this.KeyPreview = true;
@@ -386,6 +454,45 @@ namespace market.Forms
             catch (Exception ex)
             {
                 MessageBox.Show($"加载数据失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 条形码扫描功能
+        /// </summary>
+        private void ScanBarcode()
+        {
+            try
+            {
+                // 如果当前是编辑模式，商品编码是只读的，不允许扫描
+                if (_isEditMode)
+                {
+                    MessageBox.Show("编辑模式下不允许修改商品编码", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 创建扫描对话框
+                var scanForm = new BarcodeScannerForm();
+                var result = scanForm.ShowDialog();
+                
+                if (result == DialogResult.OK && !string.IsNullOrEmpty(scanForm.ScannedBarcode))
+                {
+                    // 将扫描到的条形码填入商品编码框
+                    _txtProductCode.Text = scanForm.ScannedBarcode;
+                    
+                    // 自动聚焦到下一个输入框（商品名称）
+                    _txtName.Focus();
+                    
+                    MessageBox.Show($"条形码扫描成功: {scanForm.ScannedBarcode}", "扫描成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    MessageBox.Show("扫描已取消", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"扫描条形码失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

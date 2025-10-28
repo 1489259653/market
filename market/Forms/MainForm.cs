@@ -1,7 +1,7 @@
 using System;
-using market.Forms;
 using System.Drawing;
 using System.Windows.Forms;
+using market.Forms;
 using market.Services;
 
 namespace market.Forms
@@ -69,6 +69,7 @@ namespace market.Forms
             inventoryMenu.DropDownItems.Add("进货管理", null, (s, e) => ShowPurchaseManagement());
             inventoryMenu.DropDownItems.Add("库存查询", null, (s, e) => ShowInventoryQuery());
             inventoryMenu.DropDownItems.Add("库存预警", null, (s, e) => ShowStockAlert());
+            inventoryMenu.DropDownItems.Add("供应商管理", null, (s, e) => ShowSupplierManagement());
 
             // 销售管理菜单
             var salesMenu = new ToolStripMenuItem("销售管理(&S)");
@@ -212,6 +213,32 @@ namespace market.Forms
             }
         }
 
+        // 供应商管理功能
+        private void ShowSupplierManagement()
+        {
+            try
+            {
+                if (!_authService.HasPermission("供应商管理"))
+                {
+                    MessageBox.Show("您没有权限访问供应商管理功能！", "权限不足", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // 打开库存管理表单，显示供应商管理选项卡
+                var inventoryForm = new InventoryForm();
+                inventoryForm.StartPosition = FormStartPosition.CenterParent;
+                // 设置默认选中供应商管理选项卡（索引4）
+                inventoryForm.SetDefaultTab(4);
+                inventoryForm.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开供应商管理失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         // 库存预警功能
         private void ShowStockAlert()
         {
@@ -347,11 +374,27 @@ namespace market.Forms
             }
         }
 
-        // 其他功能模块的占位方法
-
+        // 进货管理功能
         private void ShowPurchaseManagement()
         {
-            ShowFeatureNotImplemented("进货管理");
+            try
+            {
+                // 检查用户权限
+                if (!_authService.HasPermission("进货管理"))
+                {
+                    MessageBox.Show("您没有权限访问进货管理功能！", "权限不足", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var purchaseForm = new market.Forms.PurchaseManagementForm(_databaseService, _authService);
+                purchaseForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开进货管理失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowSalesCounter()

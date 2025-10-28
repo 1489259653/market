@@ -21,7 +21,6 @@
     <!-- 模型文件 -->
     <Compile Include="Models\Product.cs" />
     <Compile Include="Models\Category.cs" />
-    <Compile Include="Models\Supplier.cs" />
     <Compile Include="Models\Order.cs" />
     <Compile Include="Models\User.cs" />
     <Compile Include="Models\InventoryHistory.cs" />
@@ -31,14 +30,29 @@
     <Compile Include="Services\ProductService.cs" />
     <Compile Include="Services\InventoryService.cs" />
     <Compile Include="Services\CategoryService.cs" />
+    <Compile Include="Services\PurchaseService.cs" />
+    <Compile Include="Services\TestDataService.cs" />
     <!-- 窗体文件 -->
-    <Compile Include="forms\InventoryForm.cs" />
+    <Compile Include="Forms\InventoryForm.cs" />
     <Compile Include="Forms\LoginForm.cs" />
     <Compile Include="Forms\MainForm.cs" />
     <Compile Include="Forms\ProductManagementForm.cs" />
     <Compile Include="Forms\ProductEditForm.cs" />
     <Compile Include="Forms\CategoryManagementForm.cs" />
     <Compile Include="Forms\CategoryEditForm.cs" />
+    <Compile Include="Forms\BarcodeScannerForm.cs" />
+    <!-- 进货管理窗体文件 -->
+    <Compile Include="Forms\PurchaseManagementForm.cs" />
+    <Compile Include="Forms\PurchaseOrderEditForm.cs" />
+    <Compile Include="Forms\PurchaseOrderItemEditForm.cs" />
+    <Compile Include="Forms\PurchaseOrderViewForm.cs" />
+    <!-- 供应商管理窗体文件 -->
+    <Compile Include="Forms\SupplierEditForm.cs" />
+    <!-- 进货服务文件 -->
+    <!-- PurchaseService.cs 已在服务文件部分定义，此处不再重复 -->
+    <!-- 进货模型文件 -->
+    <Compile Include="Models\PurchaseOrder.cs" />
+    <Compile Include="Models\Supplier.cs" />
     <!-- 原始文件 -->
     <Compile Include="Form1.cs" />
     <Compile Include="Form1.Designer.cs" />

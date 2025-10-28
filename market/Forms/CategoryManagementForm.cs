@@ -53,14 +53,24 @@ namespace market.Forms
             // 添加控件到窗体
             _splitContainer.Panel1.Controls.Add(_treeView);
             _splitContainer.Panel2.Controls.Add(_dataGridView);
-            this.Controls.AddRange(new Control[] { _toolStrip, _splitContainer, _statusStrip });
+            
+            // 设置控件的Dock属性
+            _toolStrip.Dock = DockStyle.Top;
+            _statusStrip.Dock = DockStyle.Bottom;
+            _splitContainer.Dock = DockStyle.Fill;
+            
+            // 添加控件时按正确顺序（从下到上）
+            this.Controls.Add(_statusStrip);
+            this.Controls.Add(_splitContainer);
+            this.Controls.Add(_toolStrip);
         }
 
         private void CreateToolStrip()
         {
             _toolStrip = new ToolStrip
             {
-                Dock = DockStyle.Top
+                Dock = DockStyle.Top,
+                Location = new Point(0, 0)
             };
 
             var btnAdd = new ToolStripButton("添加分类", null, (s, e) => AddCategory())
@@ -94,7 +104,8 @@ namespace market.Forms
                 ShowRootLines = true,
                 ShowLines = true,
                 ShowPlusMinus = true,
-                HideSelection = false
+                HideSelection = false,
+                Margin = new Padding(0, 5, 0, 0) // 添加上边距避免被遮挡
             };
 
             _treeView.AfterSelect += (s, e) => LoadCategoryDetails(e.Node?.Tag as string);
