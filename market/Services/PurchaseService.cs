@@ -591,6 +591,8 @@ namespace market.Services
                                     CompletedAt = reader.IsDBNull("CompletedAt") ? null : (DateTime?)reader.GetDateTime("CompletedAt")
                                 };
 
+                                // 加载订单明细以获取商品数量
+                                order.Items = GetPurchaseOrderItems(order.OrderNumber);
                                 result.Orders.Add(order);
                             }
                         }

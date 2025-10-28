@@ -1,7 +1,13 @@
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.Media;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using ZXing;
+using ZXing.Windows.Compatibility;
+using AForge.Video;
+using AForge.Video.DirectShow;
 
 namespace market.Forms
 {
@@ -10,14 +16,17 @@ namespace market.Forms
     /// </summary>
     public partial class BarcodeScannerForm : Form
     {
-        private Button _btnStartScan;
         private Button _btnCancel;
         private PictureBox _picCamera;
         private Label _lblStatus;
         private Label _lblBarcode;
-        private TextBox _txtManualBarcode;
-        private Button _btnManualInput;
         private System.Windows.Forms.Timer _scanTimer;
+        
+        // 条形码扫描相关组件
+        private VideoCaptureDevice _captureDevice; // 摄像头捕获设备
+        private BarcodeReader _barcodeReader; // 条形码解码器
+        private System.Threading.Thread _scanThread; // 扫描线程
+        private bool _isScanning; // 扫描状态标志
         
         public string ScannedBarcode { get; private set; }
 
@@ -73,7 +82,7 @@ namespace market.Forms
             // 状态标签
             _lblStatus = new Label
             {
-                Text = "请点击'开始扫描'按钮启动摄像头",
+                Text = "正在启动摄像头...",
                 Location = new Point(10, 250),
                 Size = new Size(560, 30),
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -99,62 +108,28 @@ namespace market.Forms
                 ForeColor = Color.Blue
             };
 
-            // 手动输入区域
-            var lblManualInput = new Label
-            {
-                Text = "或手动输入条形码:",
-                Location = new Point(10, 330),
-                Size = new Size(120, 25),
-                Font = new Font("微软雅黑", 10)
-            };
-
-            _txtManualBarcode = new TextBox
-            {
-                Location = new Point(140, 330),
-                Size = new Size(200, 25),
-                PlaceholderText = "请输入13位条形码"
-            };
-
-            _btnManualInput = new Button
-            {
-                Text = "确认输入",
-                Location = new Point(350, 330),
-                Size = new Size(80, 25)
-            };
-
             // 按钮区域
             var buttonPanel = new Panel
             {
-                Location = new Point(10, 380),
+                Location = new Point(10, 330),
                 Size = new Size(560, 50)
-            };
-
-            _btnStartScan = new Button
-            {
-                Text = "开始扫描",
-                Size = new Size(100, 35),
-                Location = new Point(150, 10),
-                BackColor = Color.Green,
-                ForeColor = Color.White
             };
 
             _btnCancel = new Button
             {
                 Text = "取消",
                 Size = new Size(100, 35),
-                Location = new Point(270, 10),
+                Location = new Point(230, 10),
                 BackColor = Color.Gray,
                 ForeColor = Color.White
             };
 
-            buttonPanel.Controls.Add(_btnStartScan);
             buttonPanel.Controls.Add(_btnCancel);
 
             // 添加控件到主面板
             mainPanel.Controls.AddRange(new Control[] {
                 lblCamera, _picCamera, _lblStatus,
                 lblBarcodeTitle, _lblBarcode,
-                lblManualInput, _txtManualBarcode, _btnManualInput,
                 buttonPanel
             });
 
@@ -164,28 +139,50 @@ namespace market.Forms
             // 绑定事件
             BindEvents();
 
-            // 初始化扫描计时器
+            // 初始化扫描计时器（备用）
             _scanTimer = new System.Windows.Forms.Timer
             {
                 Interval = 100 // 100ms模拟扫描间隔
             };
-            _scanTimer.Tick += ScanTimer_Tick;
+            // 不再使用计时器，直接通过摄像头帧处理
+            
+            // 初始化条形码解码器
+            _barcodeReader = new BarcodeReader
+            {
+                AutoRotate = true,
+                Options = new ZXing.Common.DecodingOptions
+                {
+                    TryHarder = true,
+                    TryInverted = true,
+                    PossibleFormats = new[] {
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.EAN_8,
+                        ZXing.BarcodeFormat.UPC_A,
+                        ZXing.BarcodeFormat.UPC_E,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39
+                    }
+                }
+            };
+            
+            // 检查是否有可用的摄像头
+            var videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            if (videoDevices.Count == 0)
+            {
+                _btnCancel.Enabled = true;
+                _lblStatus.Text = "未检测到摄像头设备";
+                _lblStatus.BackColor = Color.LightPink;
+            }
+            else
+            {
+                // 窗口加载后自动开始扫描
+                this.Load += (s, e) => StartScan();
+            }
         }
 
         private void BindEvents()
         {
-            _btnStartScan.Click += (s, e) => StartScan();
             _btnCancel.Click += (s, e) => CancelScan();
-            _btnManualInput.Click += (s, e) => ManualInputBarcode();
-            
-            // 手动输入框回车键确认
-            _txtManualBarcode.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    ManualInputBarcode();
-                }
-            };
 
             // 窗体关闭事件
             this.FormClosing += (s, e) =>
@@ -198,40 +195,40 @@ namespace market.Forms
         {
             try
             {
-                // 在实际应用中，这里应该启动摄像头
-                // 这里使用模拟实现
+                // 停止任何正在运行的扫描
+                StopScan();
                 
-                _btnStartScan.Enabled = false;
-                _btnStartScan.Text = "扫描中...";
-                _lblStatus.Text = "正在扫描条形码，请将条形码对准摄像头...";
+                _btnCancel.Enabled = true;
+                _lblStatus.Text = "正在启动摄像头...";
                 _lblStatus.BackColor = Color.LightGreen;
-
-                // 显示模拟的摄像头画面
-                _picCamera.BackColor = Color.DarkGray;
-                using (var graphics = _picCamera.CreateGraphics())
+                
+                // 获取可用摄像头列表
+                var videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                if (videoDevices.Count > 0)
                 {
-                    graphics.Clear(Color.DarkGray);
-                    var font = new Font("微软雅黑", 16, FontStyle.Bold);
-                    var brush = new SolidBrush(Color.White);
-                    graphics.DrawString("摄像头预览", font, brush, new PointF(200, 80));
-                    graphics.DrawString("📷 模拟扫描中...", font, brush, new PointF(180, 120));
+                    // 使用第一个可用摄像头
+                    _captureDevice = new VideoCaptureDevice(videoDevices[0].MonikerString);
+                    _captureDevice.NewFrame += CaptureDevice_NewFrame;
+                    _captureDevice.Start();
                 }
-
-                // 启动扫描计时器
-                _scanTimer.Start();
-
-                MessageBox.Show("摄像头已启动，请将条形码对准摄像头进行扫描。\n\n" +
-                              "注意：这是模拟功能，在实际应用中会使用真实摄像头。", 
-                              "扫描提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
+                else
+                {
+                    throw new Exception("未找到可用的摄像头设备");
+                }
+                
+                // 启动扫描线程
+                _isScanning = true;
+                _scanThread = new System.Threading.Thread(ScanLoop);
+                _scanThread.IsBackground = true;
+                _scanThread.Start();
+                
+                _lblStatus.Text = "摄像头已启动，正在扫描条形码...";
+                
+            } catch (Exception ex)
             {
-                MessageBox.Show($"启动摄像头失败: {ex.Message}\n\n" +
-                              "原因可能是：\n" +
-                              "1. 摄像头设备未连接\n" +
-                              "2. 摄像头被其他程序占用\n" +
-                              "3. 缺少摄像头驱动程序\n" +
-                              "4. 用户拒绝了摄像头访问权限", 
+                _lblStatus.Text = "启动摄像头失败";
+                _lblStatus.BackColor = Color.LightPink;
+                MessageBox.Show($"无法启动摄像头: {ex.Message}\n请确保摄像头可用且未被其他程序占用。", 
                               "摄像头错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 StopScan();
             }
@@ -239,14 +236,45 @@ namespace market.Forms
 
         private void StopScan()
         {
+            // 停止扫描线程
+            _isScanning = false;
+            if (_scanThread != null && _scanThread.IsAlive)
+            {
+                _scanThread.Join(1000); // 等待线程结束，最多1秒
+            }
+            
+            // 停止摄像头
+            if (_captureDevice != null)
+            {
+                _captureDevice.NewFrame -= CaptureDevice_NewFrame;
+                if (_captureDevice.IsRunning)
+                {
+                    _captureDevice.SignalToStop();
+                    _captureDevice.WaitForStop();
+                }
+                _captureDevice = null;
+            }
+            
             _scanTimer.Stop();
             
-            // 在实际应用中，这里应该停止摄像头
-            _picCamera.BackColor = Color.Black;
-            _btnStartScan.Enabled = true;
-            _btnStartScan.Text = "开始扫描";
-            _lblStatus.Text = "扫描已停止";
-            _lblStatus.BackColor = Color.LightGray;
+            // 重置UI
+            if (_picCamera != null)
+            {
+                _picCamera.Image?.Dispose();
+                _picCamera.Image = null;
+                _picCamera.BackColor = Color.Black;
+            }
+            
+            if (_btnCancel != null)
+            {
+                _btnCancel.Enabled = true;
+            }
+            
+            if (_lblStatus != null)
+            {
+                _lblStatus.Text = "扫描已停止";
+                _lblStatus.BackColor = Color.LightGray;
+            }
         }
 
         private void CancelScan()
@@ -256,87 +284,121 @@ namespace market.Forms
             this.Close();
         }
 
-        private void ScanTimer_Tick(object sender, EventArgs e)
+        private void CaptureDevice_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            // 模拟扫描过程
-            // 在实际应用中，这里应该分析摄像头画面中的条形码
-            
-            // 随机模拟扫描成功
-            var random = new Random();
-            if (random.Next(0, 20) == 0) // 5%的概率模拟扫描成功
+            try
             {
-                var barcode = _sampleBarcodes[random.Next(_sampleBarcodes.Length)];
-                ScanSuccess(barcode);
+                // 将摄像头捕获的帧显示在PictureBox中（镜像模式）
+                Bitmap bitmap = (Bitmap)eventArgs.Frame.Clone();
+                
+                // 创建镜像效果
+                bitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                
+                if (!this.IsDisposed && _picCamera != null)
+                {
+                    // 先释放之前的图像，避免内存泄漏
+                    Image oldImage = null;
+                    this.Invoke(new Action(() =>
+                    {
+                        oldImage = _picCamera.Image;
+                        _picCamera.Image = bitmap;
+                    }));
+                    
+                    // 在UI线程外释放旧图像
+                    oldImage?.Dispose();
+                }
+                else
+                {
+                    bitmap.Dispose();
+                }
+            } catch (Exception ex)
+            {
+                // 忽略帧处理错误
+            }
+        }
+        
+        private void ScanLoop()
+        {
+            while (_isScanning)
+            {
+                try
+                {
+                    if (_picCamera.Image != null)
+                    {
+                        // 复制图片以避免跨线程问题
+                        Bitmap bitmap;
+                        lock (_picCamera.Image)
+                        {
+                            bitmap = new Bitmap(_picCamera.Image);
+                        }
+                        
+                        // 尝试解码条形码
+                        var result = _barcodeReader.Decode(bitmap);
+                        bitmap.Dispose();
+                        
+                        if (result != null)
+                        {
+                            // 扫描成功
+                            this.Invoke(new Action(() =>
+                            {
+                                ScanSuccess(result.Text);
+                            }));
+                            break; // 扫描成功后退出循环
+                        }
+                    }
+                    
+                    // 短暂暂停以减少CPU使用率
+                    System.Threading.Thread.Sleep(50);
+                } catch (Exception ex)
+                {
+                    // 忽略扫描过程中的错误
+                }
             }
         }
 
         private void ScanSuccess(string barcode)
         {
-            _scanTimer.Stop();
+            // 停止扫描
+            _isScanning = false;
             
             ScannedBarcode = barcode;
             _lblBarcode.Text = barcode;
             _lblStatus.Text = "✓ 条形码扫描成功!";
             _lblStatus.BackColor = Color.LightGreen;
 
-            // 显示成功动画
-            _picCamera.BackColor = Color.LightGreen;
-            using (var graphics = _picCamera.CreateGraphics())
+            // 播放提示音
+            try
             {
-                graphics.Clear(Color.LightGreen);
-                var font = new Font("微软雅黑", 16, FontStyle.Bold);
-                var brush = new SolidBrush(Color.DarkGreen);
-                graphics.DrawString("✓ 扫描成功!", font, brush, new PointF(220, 80));
-                graphics.DrawString($"条形码: {barcode}", font, brush, new PointF(180, 120));
-            }
+                SystemSounds.Beep.Play();
+            } catch {}
 
-            // 自动关闭窗体
-            Task.Delay(1000).ContinueWith(t =>
+            // 显示成功信息在摄像头画面上
+            if (_picCamera.Image != null)
             {
-                if (!this.IsDisposed)
+                using (var graphics = Graphics.FromImage(_picCamera.Image))
                 {
-                    this.Invoke(new Action(() =>
+                    // 创建半透明覆盖层
+                    using (var overlayBrush = new SolidBrush(Color.FromArgb(100, Color.LightGreen)))
                     {
-                        this.DialogResult = DialogResult.OK;
-                        this.Close();
-                    }));
+                        graphics.FillRectangle(overlayBrush, 0, 0, _picCamera.Image.Width, _picCamera.Image.Height);
+                    }
+                    
+                    // 绘制成功信息
+                    var font = new Font("微软雅黑", 16, FontStyle.Bold);
+                    var brush = new SolidBrush(Color.DarkGreen);
+                    var centerX = _picCamera.Image.Width / 2;
+                    var centerY = _picCamera.Image.Height / 2;
+                    
+                    var successSize = graphics.MeasureString("✓ 扫描成功!", font);
+                    graphics.DrawString("✓ 扫描成功!", font, brush, 
+                                       centerX - successSize.Width / 2, centerY - 30);
+                    
+                    var barcodeSize = graphics.MeasureString($"条形码: {barcode}", font);
+                    graphics.DrawString($"条形码: {barcode}", font, brush, 
+                                       centerX - barcodeSize.Width / 2, centerY + 10);
                 }
-            });
-        }
-
-        private void ManualInputBarcode()
-        {
-            var barcode = _txtManualBarcode.Text.Trim();
-            
-            if (string.IsNullOrEmpty(barcode))
-            {
-                MessageBox.Show("请输入条形码", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                _txtManualBarcode.Focus();
-                return;
-            }
-
-            // 验证条形码格式（简单验证：10-13位数字）
-            if (barcode.Length < 10 || barcode.Length > 13 || !long.TryParse(barcode, out _))
-            {
-                MessageBox.Show("请输入有效的条形码（10-13位数字）", "格式错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                _txtManualBarcode.Focus();
-                return;
-            }
-
-            ScannedBarcode = barcode;
-            _lblBarcode.Text = barcode;
-            _lblStatus.Text = "✓ 手动输入成功!";
-            _lblStatus.BackColor = Color.LightBlue;
-
-            // 显示成功信息
-            _picCamera.BackColor = Color.LightBlue;
-            using (var graphics = _picCamera.CreateGraphics())
-            {
-                graphics.Clear(Color.LightBlue);
-                var font = new Font("微软雅黑", 16, FontStyle.Bold);
-                var brush = new SolidBrush(Color.DarkBlue);
-                graphics.DrawString("✓ 手动输入成功!", font, brush, new PointF(200, 80));
-                graphics.DrawString($"条形码: {barcode}", font, brush, new PointF(180, 120));
+                
+                _picCamera.Refresh();
             }
 
             // 自动关闭窗体
@@ -357,8 +419,9 @@ namespace market.Forms
         {
             if (disposing)
             {
-                _scanTimer?.Stop();
+                StopScan();
                 _scanTimer?.Dispose();
+                // BarcodeReader不需要Dispose
             }
             base.Dispose(disposing);
         }

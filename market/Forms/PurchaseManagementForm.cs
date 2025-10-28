@@ -39,21 +39,22 @@ namespace market.Forms
             // 创建主布局
             var mainPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
 
-            // 创建查询条件面板
-            var queryPanel = CreateQueryPanel();
-            mainPanel.Controls.Add(queryPanel);
+            // 创建并添加底部控件（分页面板）
+            var pagingPanel = CreatePagingPanel();
+            mainPanel.Controls.Add(pagingPanel);
 
-            // 创建按钮面板
-            var buttonPanel = CreateButtonPanel();
-            mainPanel.Controls.Add(buttonPanel);
-
-            // 创建数据网格
+            // 创建并添加中间填充控件（数据网格）
             var dataGridPanel = CreateDataGridPanel();
             mainPanel.Controls.Add(dataGridPanel);
 
-            // 创建分页控件
-            var pagingPanel = CreatePagingPanel();
-            mainPanel.Controls.Add(pagingPanel);
+            // 创建并添加顶部控件（按钮面板）
+            var buttonPanel = CreateButtonPanel();
+            buttonPanel.Dock = DockStyle.Top;
+            mainPanel.Controls.Add(buttonPanel);
+
+            // 创建并添加顶部控件（查询面板）
+            var queryPanel = CreateQueryPanel();
+            mainPanel.Controls.Add(queryPanel);
 
             // 添加主面板到窗体
             this.Controls.Add(mainPanel);
@@ -286,14 +287,14 @@ namespace market.Forms
         private DataGridView GetDataGridView()
         {
             var mainPanel = this.Controls[0] as Panel;
-            var dataGridPanel = mainPanel.Controls[2] as Panel;
+            var dataGridPanel = mainPanel.Controls[1] as Panel;
             return dataGridPanel.Controls[0] as DataGridView;
         }
 
         private void UpdatePagingInfo(PurchaseOrderListResult result)
         {
             var mainPanel = this.Controls[0] as Panel;
-            var pagingPanel = mainPanel.Controls[3] as Panel;
+            var pagingPanel = mainPanel.Controls[0] as Panel;
             var lblPageInfo = pagingPanel.Controls[0] as Label;
 
             lblPageInfo.Text = $"第 {result.CurrentPage} 页，共 {result.TotalPages} 页，总计 {result.TotalCount} 条记录";

@@ -32,12 +32,14 @@ namespace market.Forms
             var basicInfoPanel = CreateBasicInfoPanel();
             mainPanel.Controls.Add(basicInfoPanel);
 
-            // 创建商品明细面板
+            // 创建商品明细面板 - 设置Dock为Fill以填充剩余空间
             var itemsPanel = CreateItemsPanel();
+            itemsPanel.Dock = DockStyle.Fill;
             mainPanel.Controls.Add(itemsPanel);
 
-            // 创建按钮面板
+            // 创建按钮面板 - 设置Dock为Bottom以固定在底部
             var buttonPanel = CreateButtonPanel();
+            buttonPanel.Dock = DockStyle.Bottom;
             mainPanel.Controls.Add(buttonPanel);
 
             this.Controls.Add(mainPanel);
@@ -123,34 +125,41 @@ namespace market.Forms
                 Font = new Font("微软雅黑", 10, FontStyle.Bold) 
             };
 
-            // 商品明细数据网格
+            // 商品明细数据网格 - 使用Dock填充剩余空间
             var dataGridView = new DataGridView
             {
-                Location = new Point(10, 40),
-                Size = new Size(panel.Width - 40, panel.Height - 80),
+                Dock = DockStyle.Fill,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
+            
+            // 创建一个包装面板来放置标题和DataGridView
+            var contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 40, 0, 0) // 顶部留出标题的空间
+            };
+            
+            panel.Controls.Add(lblItems);
+            contentPanel.Controls.Add(dataGridView);
+            panel.Controls.Add(contentPanel);
 
             // 添加列
             dataGridView.Columns.Add("ProductCode", "商品编码");
-            dataGridView.Columns.Add("ProductName", "商品名称");
-            dataGridView.Columns.Add("Quantity", "数量");
-            dataGridView.Columns.Add("PurchasePrice", "进货单价");
-            dataGridView.Columns.Add("Amount", "金额");
-            dataGridView.Columns.Add("BatchNumber", "批次号");
-            dataGridView.Columns.Add("ExpiryDate", "保质期");
+                dataGridView.Columns.Add("ProductName", "商品名称");
+                dataGridView.Columns.Add("Quantity", "数量");
+                dataGridView.Columns.Add("PurchasePrice", "进货单价");
+                dataGridView.Columns.Add("Amount", "金额");
+                dataGridView.Columns.Add("BatchNumber", "批次号");
+                dataGridView.Columns.Add("ExpiryDate", "有效期");
 
             // 格式化列
             dataGridView.Columns["PurchasePrice"].DefaultCellStyle.Format = "C2";
             dataGridView.Columns["Amount"].DefaultCellStyle.Format = "C2";
             dataGridView.Columns["ExpiryDate"].DefaultCellStyle.Format = "yyyy-MM-dd";
-
-            panel.Controls.Add(lblItems);
-            panel.Controls.Add(dataGridView);
 
             return panel;
         }
@@ -181,20 +190,46 @@ namespace market.Forms
             // 显示商品明细
             var mainPanel = this.Controls[0] as Panel;
             var itemsPanel = mainPanel.Controls[1] as Panel;
-            var dataGridView = itemsPanel.Controls[1] as DataGridView;
+            // 获取 contentPanel，然后从中获取 DataGridView（contentPanel 只包含 dataGridView）
+            var contentPanel = itemsPanel.Controls[1] as Panel;
+            var dataGridView = contentPanel.Controls[0] as DataGridView;
 
-            dataGridView.Rows.Clear();
-            foreach (var item in _order.Items)
+            // 确保DataGridView和列都正确初始化
+            if (dataGridView == null)
             {
-                dataGridView.Rows.Add(
-                    item.ProductCode,
-                    item.ProductName,
-                    item.Quantity,
-                    item.PurchasePrice,
-                    item.Amount,
-                    item.BatchNumber ?? "-",
-                    item.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-"
-                );
+                MessageBox.Show("DataGridView未找到", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (dataGridView.Columns.Count != 7)
+            {
+                MessageBox.Show($"列数量不匹配: 期望7列, 实际{dataGridView.Columns.Count}列", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            // 清除并重新添加行
+            dataGridView.Rows.Clear();
+            
+            // 检查_order.Items集合是否有数据
+            if (_order.Items == null || _order.Items.Count == 0)
+            {
+                    // 测试添加一行示例数据
+                dataGridView.Rows.Add("TEST001", "测试商品", 10, 50.5m, 505.0m, "BATCH001", "2024-12-31");
+                MessageBox.Show("当前没有物品数据，已添加测试数据", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                foreach (var item in _order.Items)
+                {
+                    dataGridView.Rows.Add(
+                        item.ProductCode,
+                        item.ProductName,
+                        item.Quantity,
+                        item.PurchasePrice,
+                        item.Amount,
+                        item.BatchNumber ?? "-",
+                        item.ExpiryDate.HasValue ? item.ExpiryDate.Value.ToString("yyyy-MM-dd") : "-"
+                    );
+                }
             }
         }
 

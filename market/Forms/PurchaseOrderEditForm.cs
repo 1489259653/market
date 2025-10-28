@@ -48,12 +48,14 @@ namespace market.Forms
             var basicInfoPanel = CreateBasicInfoPanel();
             mainPanel.Controls.Add(basicInfoPanel);
 
-            // 创建商品明细面板
+            // 创建商品明细面板 - 设置Dock为Fill以填充剩余空间
             var itemsPanel = CreateItemsPanel();
+            itemsPanel.Dock = DockStyle.Fill;
             mainPanel.Controls.Add(itemsPanel);
 
-            // 创建按钮面板
+            // 创建按钮面板 - 设置Dock为Bottom以固定在底部
             var buttonPanel = CreateButtonPanel();
+            buttonPanel.Dock = DockStyle.Bottom;
             mainPanel.Controls.Add(buttonPanel);
 
             this.Controls.Add(mainPanel);
@@ -126,17 +128,18 @@ namespace market.Forms
             var panel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(10)
             };
 
             // 商品明细标题
             var lblItems = new Label { Text = "商品明细", Location = new Point(10, 10), Font = new Font("微软雅黑", 10, FontStyle.Bold) };
 
-            // 商品明细数据网格
+            // 商品明细数据网格 - 使用Dock填充剩余空间
             var dataGridView = new DataGridView
             {
                 Location = new Point(10, 40),
-                Size = new Size(950, 400), // 固定高度，避免依赖面板高度
+                Dock = DockStyle.Fill,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 ReadOnly = true,
@@ -151,13 +154,40 @@ namespace market.Forms
             dataGridView.Columns.Add("PurchasePrice", "进货单价");
             dataGridView.Columns.Add("Amount", "金额");
             dataGridView.Columns.Add("BatchNumber", "批次号");
+            dataGridView.Columns.Add("ExpiryDate", "有效期");
 
-            // 操作按钮 - 使用固定位置
-            var btnAddItem = new Button { Text = "添加商品", Location = new Point(10, 450), Size = new Size(80, 30) };
-            var btnEditItem = new Button { Text = "编辑", Location = new Point(100, 450), Size = new Size(60, 30) };
-            var btnDeleteItem = new Button { Text = "删除", Location = new Point(170, 450), Size = new Size(60, 30) };
+            // 创建按钮面板，固定在底部
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 40,
+                Padding = new Padding(10, 5, 0, 0)
+            };
 
-            panel.Controls.AddRange(new Control[] { lblItems, dataGridView, btnAddItem, btnEditItem, btnDeleteItem });
+            var btnAddItem = new Button { Text = "添加商品", Size = new Size(80, 30), Location = new Point(0, 0) };
+            var btnEditItem = new Button { Text = "编辑", Size = new Size(60, 30), Location = new Point(90, 0) };
+            var btnDeleteItem = new Button { Text = "删除", Size = new Size(60, 30), Location = new Point(160, 0) };
+
+            buttonPanel.Controls.AddRange(new Control[] { btnAddItem, btnEditItem, btnDeleteItem });
+
+            // 创建一个包装面板来放置标题和DataGridView，使其不被按钮面板覆盖
+            var contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 0, 0, 40) // 底部留出按钮面板的空间
+            };
+            
+            contentPanel.Controls.Add(lblItems);
+            
+            // 调整DataGridView的位置和大小
+            dataGridView.Location = new Point(10, 40);
+            dataGridView.Size = new Size(contentPanel.Width - 20, contentPanel.Height - 50);
+            
+            contentPanel.Controls.Add(dataGridView);
+
+            // 将所有面板添加到主面板
+            panel.Controls.Add(buttonPanel);
+            panel.Controls.Add(contentPanel);
 
             // 事件处理
             btnAddItem.Click += (s, e) => AddItem();
@@ -206,7 +236,28 @@ namespace market.Forms
                 numTaxRate.Value = _order.TaxAmount / _order.TotalAmount * 100;
                 txtNotes.Text = _order.Notes ?? "";
 
-                _items = _order.Items;
+                // 确保_items列表正确初始化，不直接引用_order.Items
+                _items = new List<PurchaseOrderItem>();
+                if (_order.Items != null)
+                {
+                    // 深拷贝物品列表，确保数据正确加载
+                    foreach (var item in _order.Items)
+                    {
+                        _items.Add(new PurchaseOrderItem
+                        {
+                            Id = item.Id,
+                            OrderNumber = item.OrderNumber,
+                            ProductCode = item.ProductCode,
+                            ProductName = item.ProductName,
+                            Quantity = item.Quantity,
+                            PurchasePrice = item.PurchasePrice,
+                            Amount = item.Amount,
+                            BatchNumber = item.BatchNumber,
+                            ExpiryDate = item.ExpiryDate,
+                            Notes = item.Notes
+                        });
+                    }
+                }
                 RefreshItemsGrid();
                 CalculateAmounts();
             }
@@ -219,6 +270,9 @@ namespace market.Forms
 
                 txtOrderNumber.Text = _purchaseService.GeneratePurchaseOrderNumber();
                 dtpOrderDate.Value = DateTime.Today;
+                
+                // 确保_items列表在新建模式下也被正确初始化
+                _items = new List<PurchaseOrderItem>();
             }
         }
 
@@ -278,7 +332,9 @@ namespace market.Forms
         private PurchaseOrderItem GetSelectedItem()
         {
             var itemsPanel = GetItemsPanel();
-            var dataGridView = itemsPanel.Controls[1] as DataGridView;
+            // 获取 contentPanel，然后从中获取 DataGridView（注意：dataGridView 是索引1）
+            var contentPanel = itemsPanel.Controls[1] as Panel;
+            var dataGridView = contentPanel.Controls[1] as DataGridView;
 
             if (dataGridView.SelectedRows.Count == 0)
             {
@@ -293,19 +349,46 @@ namespace market.Forms
         private void RefreshItemsGrid()
         {
             var itemsPanel = GetItemsPanel();
-            var dataGridView = itemsPanel.Controls[1] as DataGridView;
+            // 获取 contentPanel，然后从中获取 DataGridView（注意：dataGridView 是索引1）
+            var contentPanel = itemsPanel.Controls[1] as Panel;
+            var dataGridView = contentPanel.Controls[1] as DataGridView;
 
-            dataGridView.Rows.Clear();
-            foreach (var item in _items)
+            // 确保DataGridView和列都正确初始化
+            if (dataGridView == null)
             {
-                dataGridView.Rows.Add(
-                    item.ProductCode,
-                    item.ProductName,
-                    item.Quantity,
-                    item.PurchasePrice,
-                    item.Amount,
-                    item.BatchNumber
-                );
+                MessageBox.Show("DataGridView未找到", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (dataGridView.Columns.Count != 7)
+            {
+                MessageBox.Show($"列数量不匹配: 期望7列, 实际{dataGridView.Columns.Count}列", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            // 清除并重新添加行
+            dataGridView.Rows.Clear();
+            
+            // 检查_items集合是否有数据
+            if (_items.Count == 0)
+            {
+                // 测试添加一行示例数据
+                dataGridView.Rows.Add("TEST001", "测试商品", 10, 50.5m, 505.0m, "BATCH001", "2024-12-31");
+                MessageBox.Show("当前没有物品数据，已添加测试数据", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                foreach (var item in _items)
+                {
+                    dataGridView.Rows.Add(
+                        item.ProductCode,
+                        item.ProductName,
+                        item.Quantity,
+                        item.PurchasePrice,
+                        item.Amount,
+                        item.BatchNumber ?? "-",
+                        item.ExpiryDate.HasValue ? item.ExpiryDate.Value.ToString("yyyy-MM-dd") : "-"
+                    );
+                }
             }
         }
 
