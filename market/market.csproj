@@ -22,6 +22,7 @@
     <PackageReference Include="AForge.Video" Version="2.2.5" />
     <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
     <PackageReference Include="EPPlus" Version="7.0.5" />
+    <PackageReference Include="System.Data.SQLite" Version="1.0.118.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +34,7 @@
     <Compile Include="Models\InventoryHistory.cs" />
     <Compile Include="Models\Sale.cs" />
     <Compile Include="Models\ReturnOrder.cs" />
+    <Compile Include="Models\OperationLog.cs" />
     <!-- 服务文件 -->
     <Compile Include="Services\DatabaseService.cs" />
     <Compile Include="Services\AuthService.cs" />
@@ -44,6 +46,7 @@
     <Compile Include="Services\ReturnService.cs" />
     <Compile Include="Services\TestDataService.cs" />
     <Compile Include="Services\MachineCodeService.cs" />
+    <Compile Include="Services\LogService.cs" />
     <!-- 窗体文件 -->
     <Compile Include="Forms\InventoryForm.cs" />
     <Compile Include="Forms\LoginForm.cs" />
@@ -53,6 +56,7 @@
     <Compile Include="Forms\CategoryManagementForm.cs" />
     <Compile Include="Forms\CategoryEditForm.cs" />
     <Compile Include="Forms\BarcodeScannerForm.cs" />
+    <Compile Include="Forms\OperationLogForm.cs" />
     <!-- 进货管理窗体文件 -->
     <Compile Include="Forms\PurchaseManagementForm.cs" />
     <Compile Include="Forms\PurchaseOrderEditForm.cs" />

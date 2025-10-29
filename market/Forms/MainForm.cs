@@ -483,7 +483,16 @@ namespace market.Forms
 
         private void ShowOperationLogs()
         {
-            ShowFeatureNotImplemented("操作日志");
+            _contentPanel.Controls.Clear();
+            
+            var logService = new LogService(_databaseService);
+            var operationLogForm = new OperationLogForm(logService);
+            operationLogForm.TopLevel = false;
+            operationLogForm.Dock = DockStyle.Fill;
+            operationLogForm.FormBorderStyle = FormBorderStyle.None;
+            
+            _contentPanel.Controls.Add(operationLogForm);
+            operationLogForm.Show();
         }
 
         private void ShowBackup()
