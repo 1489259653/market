@@ -543,8 +543,18 @@ namespace market.Services
         }
 
         /// <summary>
+        /// 获取数据库连接字符串
+        /// </summary>
+        /// <returns>连接字符串</returns>
+        public string GetConnectionString()
+        {
+            return _connectionString;
+        }
+        
+        /// <summary>
         /// 获取数据库连接
         /// </summary>
+        /// <returns>数据库连接对象</returns>
         public MySqlConnection GetConnection()
         {
             try

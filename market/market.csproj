@@ -22,7 +22,6 @@
     <PackageReference Include="AForge.Video" Version="2.2.5" />
     <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
     <PackageReference Include="EPPlus" Version="7.0.5" />
-    <PackageReference Include="System.Data.SQLite" Version="1.0.118.0" />
 
   </ItemGroup>
 
@@ -48,7 +47,9 @@
     <Compile Include="Services\TestDataService.cs" />
     <Compile Include="Services\MachineCodeService.cs" />
     <Compile Include="Services\LogService.cs" />
+    <Compile Include="Services\BackupService.cs" />
     <!-- 窗体文件 -->
+    <Compile Include="Forms\BackupForm.cs" />
     <Compile Include="Forms\InventoryForm.cs" />
     <Compile Include="Forms\LoginForm.cs" />
     <Compile Include="Forms\MainForm.cs" />

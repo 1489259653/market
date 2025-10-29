@@ -12,11 +12,11 @@ This is a comprehensive C# WinForms supermarket management system built on .NET 
 ## Architecture
 - **UI Layer**: WinForms modular interface with multiple specialized forms
 - **Business Layer**: Service classes for core business logic
-- **Data Layer**: SQLite database with Entity Framework-like operations
+- **Data Layer**: MySQL database with Entity Framework-like operations
 - **Entry Point**: Program.cs - Application startup with dependency injection
 - **Target Framework**: .NET 6.0 Windows
 - **Output Type**: Windows Executable (WinExe)
-- **Database**: SQLite (primary) + MariaDB (optional)
+- **Database**: MySQL (primary)
 
 ## Key Files and Structure
 
@@ -42,7 +42,7 @@ This is a comprehensive C# WinForms supermarket management system built on .NET 
 - `InventoryHistory.cs` - 库存历史模型
 
 ### 服务层 (`market/Services/`)
-- `DatabaseService.cs` - 数据库服务 (SQLite管理)
+- `DatabaseService.cs` - 数据库服务 (MySQL管理)
 - `AuthService.cs` - 身份验证服务
 - `ProductService.cs` - 商品管理服务
 - `SaleService.cs` - 销售管理服务
@@ -92,7 +92,7 @@ This is a comprehensive C# WinForms supermarket management system built on .NET 
 
 ## 技术架构详情
 - **目标框架**: .NET 6.0 Windows (已从.NET Framework 4.8升级)
-- **数据库**: SQLite (主数据库) + MariaDB (备用数据库)
+- **数据库**: MySQL (主数据库)
 - **UI框架**: WinForms with modern控件布局
 - **安全特性**: MD5密码加密、角色权限控制、操作日志
 - **硬件集成**: 摄像头扫描 (AForge.Video库)、Mock支付接口

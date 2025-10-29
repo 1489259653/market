@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using market.Forms;
+using System.Collections.Generic;
 using market.Services;
 using market.Models;
 
@@ -81,7 +81,6 @@ namespace market.Forms
             // 报表菜单
             var reportMenu = new ToolStripMenuItem("报表(&R)");
             reportMenu.DropDownItems.Add("销售统计", null, (s, e) => ShowSalesReport());
-            reportMenu.DropDownItems.Add("库存报表", null, (s, e) => ShowInventoryReport());
 
             // 系统管理菜单
             var systemMenu = new ToolStripMenuItem("系统管理(&Y)");
@@ -488,11 +487,6 @@ namespace market.Forms
             }
         }
 
-        private void ShowInventoryReport()
-        {
-            ShowFeatureNotImplemented("库存报表");
-        }
-
         private void ShowUserManagement()
         {
             ShowFeatureNotImplemented("用户管理");
@@ -514,7 +508,33 @@ namespace market.Forms
 
         private void ShowBackup()
         {
-            ShowFeatureNotImplemented("数据备份");
+            try
+            {
+                // 检查用户权限
+                if (!_authService.HasPermission("数据备份"))
+                {
+                    MessageBox.Show("您没有权限访问数据备份功能！", "权限不足", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // 使用完全限定名创建实例
+                var backupService = new market.Services.BackupService(_databaseService);
+                var backupForm = new market.Forms.BackupForm(backupService, _authService);
+                
+                // 清空内容面板并显示新窗体
+                _contentPanel.Controls.Clear();
+                backupForm.TopLevel = false;
+                backupForm.FormBorderStyle = FormBorderStyle.None;
+                backupForm.Dock = DockStyle.Fill;
+                _contentPanel.Controls.Add(backupForm);
+                backupForm.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开数据备份失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowFeatureNotImplemented(string featureName)
