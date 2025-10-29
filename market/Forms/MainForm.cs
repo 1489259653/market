@@ -12,6 +12,7 @@ namespace market.Forms
         private readonly AuthService _authService;
         private readonly DatabaseService _databaseService;
         private readonly ProductService _productService;
+        private readonly MemberService _memberService;
         
         private MenuStrip _mainMenu;
         private StatusStrip _statusStrip;
@@ -22,6 +23,7 @@ namespace market.Forms
             _authService = authService;
             _databaseService = databaseService;
             _productService = new ProductService(databaseService);
+            _memberService = new MemberService(databaseService);
             
             InitializeComponent();
             SetupMenu();
@@ -84,7 +86,7 @@ namespace market.Forms
 
             // 系统管理菜单
             var systemMenu = new ToolStripMenuItem("系统管理(&Y)");
-            systemMenu.DropDownItems.Add("用户管理", null, (s, e) => ShowUserManagement());
+            systemMenu.DropDownItems.Add("用户管理", null, (s, e) => ShowMemberManagement());
             systemMenu.DropDownItems.Add("操作日志", null, (s, e) => ShowOperationLogs());
             systemMenu.DropDownItems.Add("数据备份", null, (s, e) => ShowBackup());
 
@@ -156,6 +158,29 @@ namespace market.Forms
                 Models.UserRole.WarehouseManager => "仓库管理员",
                 _ => "未知角色"
             };
+        }
+
+        private void ShowMemberManagement()
+        {
+            try
+            {
+                // 检查用户权限
+                if (!_authService.HasPermission("用户管理"))
+                {
+                    MessageBox.Show("您没有权限访问用户管理功能！", "权限不足", 
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var memberForm = new MemberManagementForm(_memberService);
+                memberForm.StartPosition = FormStartPosition.CenterParent;
+                memberForm.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开用户管理失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowWelcomeScreen()

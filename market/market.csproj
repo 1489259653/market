@@ -35,6 +35,7 @@
     <Compile Include="Models\Sale.cs" />
     <Compile Include="Models\ReturnOrder.cs" />
     <Compile Include="Models\OperationLog.cs" />
+    <Compile Include="Models\Member.cs" />
     <!-- 服务文件 -->
     <Compile Include="Services\DatabaseService.cs" />
     <Compile Include="Services\AuthService.cs" />
@@ -48,6 +49,7 @@
     <Compile Include="Services\MachineCodeService.cs" />
     <Compile Include="Services\LogService.cs" />
     <Compile Include="Services\BackupService.cs" />
+    <Compile Include="Services\MemberService.cs" />
     <!-- 窗体文件 -->
     <Compile Include="Forms\BackupForm.cs" />
     <Compile Include="Forms\InventoryForm.cs" />
@@ -59,6 +61,7 @@
     <Compile Include="Forms\CategoryEditForm.cs" />
     <Compile Include="Forms\BarcodeScannerForm.cs" />
     <Compile Include="Forms\OperationLogForm.cs" />
+    <Compile Include="Forms\MemberManagementForm.cs" />
     <!-- 进货管理窗体文件 -->
     <Compile Include="Forms\PurchaseManagementForm.cs" />
     <Compile Include="Forms\PurchaseOrderEditForm.cs" />
