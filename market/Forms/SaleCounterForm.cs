@@ -49,21 +49,29 @@ namespace market.Forms
         private void InitializeForm()
         {
             // 创建主布局面板
-            var mainPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+            var mainPanel = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+            mainPanel.RowCount = 3;
+            mainPanel.ColumnCount = 1;
+            
+            // 设置行高比例：输入面板固定高度，购物车面板填充剩余空间，结算面板固定高度
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 100)); // 输入面板
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // 购物车面板（填充剩余空间）
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // 结算面板
 
             // 创建顶部商品输入面板
             var inputPanel = CreateInputPanel();
-            mainPanel.Controls.Add(inputPanel);
+            inputPanel.Dock = DockStyle.Fill;
+            mainPanel.Controls.Add(inputPanel, 0, 0);
 
             // 创建购物车面板
             var cartPanel = CreateCartPanel();
             cartPanel.Dock = DockStyle.Fill;
-            mainPanel.Controls.Add(cartPanel);
+            mainPanel.Controls.Add(cartPanel, 0, 1);
 
             // 创建底部结算面板
             var settlementPanel = CreateSettlementPanel();
-            settlementPanel.Dock = DockStyle.Bottom;
-            mainPanel.Controls.Add(settlementPanel);
+            settlementPanel.Dock = DockStyle.Fill;
+            mainPanel.Controls.Add(settlementPanel, 0, 2);
 
             this.Controls.Add(mainPanel);
         }
@@ -126,18 +134,19 @@ namespace market.Forms
             };
 
             // 购物车标题
-            var lblCartTitle = new Label { Text = "购物车", Location = new Point(10, 10), Font = new Font("微软雅黑", 12, FontStyle.Bold) };
+            var lblCartTitle = new Label { Text = "购物车", Location = new Point(10, 10), Font = new Font("微软雅黑", 12, FontStyle.Bold), AutoSize = true };
 
             // 购物车数据网格
             _dgvCart = new DataGridView
             {
-                Location = new Point(10, 40),
-                Size = new Size(panel.Width - 40, panel.Height - 100),
+                Location = new Point(10, 50),
+                Size = new Size(panel.ClientSize.Width - 40, panel.ClientSize.Height - 120),
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
 
             // 添加列
@@ -153,13 +162,23 @@ namespace market.Forms
             _dgvCart.Columns["Amount"].DefaultCellStyle.Format = "C2";
             _dgvCart.Columns["Amount"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
+            // 操作按钮面板
+            var buttonPanel = new Panel
+            {
+                Location = new Point(10, panel.ClientSize.Height - 60),
+                Size = new Size(300, 40),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+            };
+
             // 操作按钮
-            var btnEdit = new Button { Text = "修改数量", Location = new Point(10, panel.Height - 50), Size = new Size(80, 30) };
-            var btnRemove = new Button { Text = "删除商品", Location = new Point(100, panel.Height - 50), Size = new Size(80, 30) };
-            var btnClear = new Button { Text = "清空购物车", Location = new Point(190, panel.Height - 50), Size = new Size(80, 30) };
+            var btnEdit = new Button { Text = "修改数量", Location = new Point(0, 0), Size = new Size(80, 30) };
+            var btnRemove = new Button { Text = "删除商品", Location = new Point(90, 0), Size = new Size(80, 30) };
+            var btnClear = new Button { Text = "清空购物车", Location = new Point(180, 0), Size = new Size(100, 30) };
+
+            buttonPanel.Controls.AddRange(new Control[] { btnEdit, btnRemove, btnClear });
 
             panel.Controls.AddRange(new Control[] {
-                lblCartTitle, _dgvCart, btnEdit, btnRemove, btnClear
+                lblCartTitle, _dgvCart, buttonPanel
             });
 
             // 事件处理
@@ -167,6 +186,16 @@ namespace market.Forms
             btnRemove.Click += (s, e) => RemoveCartItem();
             btnClear.Click += (s, e) => ClearCart();
             _dgvCart.SelectionChanged += (s, e) => UpdateButtonStates();
+
+            // 处理面板大小变化
+            panel.SizeChanged += (s, e) =>
+            {
+                if (_dgvCart != null)
+                {
+                    _dgvCart.Size = new Size(panel.ClientSize.Width - 40, panel.ClientSize.Height - 120);
+                    buttonPanel.Location = new Point(10, panel.ClientSize.Height - 60);
+                }
+            };
 
             return panel;
         }

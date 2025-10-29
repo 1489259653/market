@@ -409,7 +409,7 @@ namespace market.Forms
                     return;
                 }
 
-                var saleService = new SaleService(_databaseService);
+                var saleService = new SaleService(_databaseService, _authService);
                 var saleForm = new SaleCounterForm(saleService, _authService);
                 saleForm.ShowDialog();
             }

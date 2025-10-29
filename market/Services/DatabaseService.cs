@@ -151,7 +151,9 @@ namespace market.Services
                         Category VARCHAR(100) NOT NULL,
                         ExpiryDate DATE,
                         StockAlertThreshold INT DEFAULT 10,
-                        SupplierId VARCHAR(50)
+                        SupplierId VARCHAR(50),
+                        PurchasePrice DECIMAL(10,2) DEFAULT 0,
+                        IsActive BOOLEAN DEFAULT TRUE
                     )";
 
                 // 创建订单表
@@ -408,13 +410,13 @@ namespace market.Services
                     if (count == 0)
                     {
                         var insertProducts = @"
-                            INSERT IGNORE INTO Products (ProductCode, Name, Price, Quantity, Unit, Category, ExpiryDate, StockAlertThreshold, SupplierId) 
+                            INSERT IGNORE INTO Products (ProductCode, Name, Price, Quantity, Unit, Category, ExpiryDate, StockAlertThreshold, SupplierId, PurchasePrice, IsActive) 
                             VALUES 
-                            ('P001', '可口可乐', 3.50, 100, '瓶', '饮料', '2024-12-31', 10, 'supplier003'),
-                            ('P002', '康师傅红烧牛肉面', 4.50, 80, '桶', '食品', '2024-10-31', 15, 'supplier001'),
-                            ('P003', '海飞丝洗发水', 25.00, 50, '瓶', '日用品', '2025-06-30', 5, 'supplier002'),
-                            ('P004', '金龙鱼食用油', 65.00, 30, '桶', '粮油', '2024-08-31', 3, 'supplier001'),
-                            ('P005', '中华铅笔', 1.50, 200, '支', '文具', NULL, 20, 'supplier002')";
+                            ('P001', '可口可乐', 3.50, 100, '瓶', '饮料', '2024-12-31', 10, 'supplier003', 2.50, TRUE),
+                            ('P002', '康师傅红烧牛肉面', 4.50, 80, '桶', '食品', '2024-10-31', 15, 'supplier001', 3.00, TRUE),
+                            ('P003', '海飞丝洗发水', 25.00, 50, '瓶', '日用品', '2025-06-30', 5, 'supplier002', 18.00, TRUE),
+                            ('P004', '金龙鱼食用油', 65.00, 30, '桶', '粮油', '2024-08-31', 3, 'supplier001', 50.00, TRUE),
+                            ('P005', '中华铅笔', 1.50, 200, '支', '文具', NULL, 20, 'supplier002', 1.00, TRUE)";
                         
                         using (var insertCommand = new MySqlCommand(insertProducts, connection))
                         {
