@@ -1,45 +1,110 @@
 # CODEBUDDY.md This file provides guidance to CodeBuddy Code when working with code in this repository.
 
 ## Project Overview
-This is a C# WinForms supermarket management system built on .NET Framework 4.8. The project is structured as a single Visual Studio solution with one Windows Forms application project.
+This is a comprehensive C# WinForms supermarket management system built on .NET 6.0 Windows. The project implements a complete supermarket retail management solution with modular architecture.
 
 ## Build and Development Commands
-- **Build**: Use Visual Studio build or `MSBuild market.sln`
-- **Run**: Execute `market\bin\Debug\market.exe` or `market\bin\Release\market.exe`
-- **Clean**: Use `MSBuild market.sln /t:Clean` or Visual Studio clean
-- **Rebuild**: Use `MSBuild market.sln /t:Clean;Build`
+- **Build**: `dotnet build` or `dotnet build --configuration Release`
+- **Run**: `dotnet run` or execute `market\bin\Debug\net6.0-windows\market.exe`
+- **Clean**: `dotnet clean`
+- **Rebuild**: `dotnet clean && dotnet build`
 
 ## Architecture
-- **UI Layer**: WinForms (Form1.cs) - Main application window
-- **Entry Point**: Program.cs - Application startup
-- **Target Framework**: .NET Framework 4.8
+- **UI Layer**: WinForms modular interface with multiple specialized forms
+- **Business Layer**: Service classes for core business logic
+- **Data Layer**: SQLite database with Entity Framework-like operations
+- **Entry Point**: Program.cs - Application startup with dependency injection
+- **Target Framework**: .NET 6.0 Windows
 - **Output Type**: Windows Executable (WinExe)
+- **Database**: SQLite (primary) + MariaDB (optional)
 
 ## Key Files and Structure
-- `market.sln` - Visual Studio solution file
-- `market/market.csproj` - Project configuration
-- `market/Form1.cs` - Main form class
-- `market/Form1.Designer.cs` - Form designer code
-- `market/Program.cs` - Application entry point
-- `market/App.config` - Application configuration
-- `market/Properties/` - Assembly information and resources
 
-## Domain Model (Based on Requirements)
-The system implements a supermarket management system with:
-- **Product Management**: Products with codes, pricing, categories, inventory
-- **Category Management**: Hierarchical product categories with tree structure
-- **Inventory Tracking**: Stock levels with replenishment alerts
-- **Sales Processing**: Transaction handling with receipts
-- **User Management**: Role-based access (Admin, Cashier, Warehouse Manager)
-- **Reporting**: Sales analytics and inventory reports
+### 项目根目录
+- `market.sln` - Visual Studio解决方案文件
+- `开发进度.md` - 项目开发进度跟踪文档
+- `需求规格.md` - 完整需求规格说明书
+- `test_functions.md` - 功能验证清单
 
-## Development Notes
-- This is a Windows Forms application, not a web or console app
-- Database layer uses MariaDB/MySQL with connection pooling
-- Support for hierarchical product categories with unlimited levels
-- Mock implementations are used for hardware integration (scanning, printing)
-- Follows Chinese business requirements and terminology
-- Focus on supermarket retail operations and inventory management
+### 核心项目结构 (`market/`)
+- `market.csproj` - 项目配置文件 (.NET 6.0 Windows)
+- `Program.cs` - 应用程序入口点
+- `DataInitializer.cs` - 数据库初始化脚本
+
+### 数据模型层 (`market/Models/`)
+- `Product.cs` - 商品信息模型
+- `Supplier.cs` - 供应商信息模型
+- `Order.cs`, `Sale.cs` - 订单和销售模型
+- `Category.cs` - 商品分类模型
+- `User.cs` - 用户信息模型
+- `PurchaseOrder.cs` - 进货单模型
+- `ReturnOrder.cs` - 退货单模型
+- `InventoryHistory.cs` - 库存历史模型
+
+### 服务层 (`market/Services/`)
+- `DatabaseService.cs` - 数据库服务 (SQLite管理)
+- `AuthService.cs` - 身份验证服务
+- `ProductService.cs` - 商品管理服务
+- `SaleService.cs` - 销售管理服务
+- `InventoryService.cs` - 库存管理服务
+- `PurchaseService.cs` - 进货管理服务
+- `ReturnService.cs` - 退货管理服务
+- `CategoryService.cs` - 分类管理服务
+- `MachineCodeService.cs` - 机器码生成服务
+- `MariaDBService.cs` - MariaDB数据库连接服务
+
+### 用户界面层 (`market/Forms/`)
+- `MainForm.cs` - 主界面框架
+- `LoginForm.cs` - 登录界面
+- `SaleCounterForm.cs` - 销售收银界面
+- `ProductManagementForm.cs` - 商品管理界面
+- `ProductEditForm.cs` - 商品编辑界面
+- `InventoryForm.cs` - 库存管理界面
+- `BarcodeScannerForm.cs` - 条形码扫描界面
+- `PaymentForm.cs` - 支付界面
+- `CategoryManagementForm.cs` - 分类管理界面
+- `PurchaseManagementForm.cs` - 进货管理界面
+- `ReturnManagementForm.cs` - 退货管理界面
+- `ReturnOrderEditForm.cs` - 退货订单编辑界面
+- `ReturnOrderViewForm.cs` - 退货订单详情界面
+- `ReturnOrderItemEditForm.cs` - 退货商品明细编辑界面
+- 及其他相关界面文件
+
+## 当前系统状态 (System Status)
+
+### ✅ 已完全实现的功能模块
+- **商品管理** - 完整的商品CRUD操作，支持分类、供应商、条形码
+- **库存管理** - 实时库存跟踪、预警系统、进货管理
+- **销售管理** - 销售收银、支付处理、订单生成
+- **退货管理** - 完整的退货流程、库存自动更新
+- **供应商管理** - 供应商信息管理、关联商品
+- **分类管理** - 分层分类结构、树形视图
+- **用户权限** - 角色控制 (管理员、收银员、仓库管理员)
+- **条形码扫描** - 摄像头扫描、商品自动识别
+- **进货管理** - 进货单流程、智能库存更新
+
+### 🔧 最近修复的重大问题
+- **数据库结构同步** - 修复Products表缺失IsActive列的问题
+- **UI布局优化** - 修复销售收银界面DataGridView显示问题
+- **内存泄露修复** - 优化条形码扫描功能的内存管理
+- **订单号生成规则** - 实现"SO年份月份日期时间操作人/机器码"格式
+- **编译兼容性** - 修复AForge库和线程管理相关错误
+
+## 技术架构详情
+- **目标框架**: .NET 6.0 Windows (已从.NET Framework 4.8升级)
+- **数据库**: SQLite (主数据库) + MariaDB (备用数据库)
+- **UI框架**: WinForms with modern控件布局
+- **安全特性**: MD5密码加密、角色权限控制、操作日志
+- **硬件集成**: 摄像头扫描 (AForge.Video库)、Mock支付接口
+- **性能优化**: 内存管理、线程安全、资源释放
+
+## 开发指南
+- 所有数据模型采用C# 9.0 record类型和属性
+- 服务层采用依赖注入模式设计
+- UI层使用TableLayoutPanel和Anchor实现响应式布局
+- 数据库操作使用参数化查询防止SQL注入
+- 异常处理采用try-catch和日志记录机制
+- 支持中文本地化界面和业务逻辑
 
 ## 供应商管理模块
 
@@ -90,8 +155,8 @@ The system implements a supermarket management system with:
 
 ### 权限设置
 - **管理员** - 拥有所有权限
-- **仓库管理员** - 拥有供应商管理权限
-- **收银员** - 无供应商管理权限
+- **仓库管理员** - 拥有供应商管理权限和退货管理权限
+- **收银员** - 无供应商管理权限和退货管理权限
 
 ## Common Tasks
 - Adding new forms: Create new Form classes and update navigation
@@ -285,3 +350,129 @@ bool CompletePurchaseOrder(string orderNumber, string operatorId)
 - **仓库管理员**: 完整的进货管理权限，包括新建、编辑、审核、完成和取消
 - **管理员**: 查看所有进货记录和统计信息
 - **收银员**: 只能查看进货记录，无管理权限
+
+## 退货管理模块
+
+### 功能特性
+- **完整退货流程**: 支持基于销售订单的退货，验证原销售订单和商品关联性
+- **智能库存管理**: 退货时自动增加商品库存，保持库存准确性
+- **退货状态管理**: 支持待处理、已审核、已完成、已取消四种状态流转
+- **退货单号生成**: 自动生成唯一退货单号（格式：RO + 年月日时分 + 操作标识）
+- **退货原因跟踪**: 支持订单级别和商品级别的退货原因记录
+- **退货统计**: 提供退货统计分析和原因分布统计
+- **权限控制**: 管理员和仓库管理员拥有退货管理权限
+
+### 数据模型
+- `ReturnOrder` 类: 退货订单主表信息，包含状态、金额、原销售单号等
+- `ReturnOrderItem` 类: 退货明细，包含商品信息、数量、价格等
+- `ReturnOrderStatus` 枚举: 退货订单状态（待处理、已审核、已完成、已取消）
+- `ReturnOrderQuery` 类: 退货订单查询条件
+- `ReturnStatistics` 类: 退货统计信息
+
+### 服务类
+- `ReturnService` 类: 提供退货管理的核心业务逻辑
+  - 退货订单的增删改查操作
+  - 退货订单状态流转管理
+  - 自动验证原销售订单和商品关联性
+  - 智能库存更新（退货增加库存）
+  - 退货统计和分析功能
+
+### 用户界面
+- `ReturnManagementForm`: 退货单主管理界面，支持查询和列表展示
+- `ReturnOrderEditForm`: 退货单编辑界面，支持新建和编辑退货单
+- `ReturnOrderViewForm`: 退货单详情查看界面，展示完整退货信息
+- `ReturnOrderItemEditForm`: 退货明细编辑界面，管理单个商品退货信息
+
+### 数据库表结构
+```sql
+-- 退货订单主表
+CREATE TABLE ReturnOrders (
+    ReturnNumber VARCHAR(50) PRIMARY KEY,
+    OriginalOrderNumber VARCHAR(50) NOT NULL,
+    ReturnDate DATETIME NOT NULL,
+    Customer VARCHAR(100) NOT NULL,
+    OperatorId VARCHAR(50) NOT NULL,
+    Status INT NOT NULL DEFAULT 0,
+    TotalAmount DECIMAL(18,2) NOT NULL,
+    RefundAmount DECIMAL(18,2) NOT NULL,
+    Reason VARCHAR(255),
+    Notes TEXT,
+    CreatedAt DATETIME NOT NULL,
+    FOREIGN KEY (OperatorId) REFERENCES Users(Id),
+    FOREIGN KEY (OriginalOrderNumber) REFERENCES SaleOrders(OrderNumber)
+);
+
+-- 退货明细表
+CREATE TABLE ReturnOrderItems (
+    Id VARCHAR(50) PRIMARY KEY,
+    ReturnNumber VARCHAR(50) NOT NULL,
+    ProductCode VARCHAR(50) NOT NULL,
+    ProductName VARCHAR(255) NOT NULL,
+    Quantity INT NOT NULL,
+    ReturnPrice DECIMAL(18,2) NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL,
+    OriginalSalePrice DECIMAL(18,2) NOT NULL,
+    Reason VARCHAR(255),
+    FOREIGN KEY (ReturnNumber) REFERENCES ReturnOrders(ReturnNumber),
+    FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode)
+);
+
+-- 退货历史记录表
+CREATE TABLE ReturnHistory (
+    Id VARCHAR(50) PRIMARY KEY,
+    ProductCode VARCHAR(50) NOT NULL,
+    Quantity INT NOT NULL,
+    ReturnPrice DECIMAL(18,2) NOT NULL,
+    Amount DECIMAL(18,2) NOT NULL,
+    ReturnNumber VARCHAR(50),
+    ReturnDate DATETIME NOT NULL,
+    OperatorId VARCHAR(50) NOT NULL,
+    Reason VARCHAR(255),
+    FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode),
+    FOREIGN KEY (ReturnNumber) REFERENCES ReturnOrders(ReturnNumber)
+);
+```
+
+### 核心业务逻辑
+
+#### 退货流程验证
+```csharp
+// 验证原销售订单是否存在
+bool SaleOrderExists(string orderNumber)
+
+// 验证退货商品是否属于原销售订单
+bool SaleOrderItemExists(string orderNumber, string productCode)
+
+// 创建退货订单（包含完整的事务处理）
+bool CreateReturnOrder(ReturnOrder returnOrder)
+{
+    // 1. 验证原销售订单
+    // 2. 验证退货商品属于原销售订单
+    // 3. 插入退货订单
+    // 4. 插入退货明细
+    // 5. 更新商品库存（增加库存）
+    // 6. 记录退货历史
+}
+```
+
+#### 退货单号生成规则
+```csharp
+// 退货单号格式：RO + 年份(4) + 月份(2) + 日期(2) + 时间(4) + 操作标识(4)
+string GenerateReturnOrderNumber()
+{
+    // 例如：RO202411251430001 (2024年11月25日14:30，操作标识0001)
+    // 操作标识优先使用用户ID后四位，无用户时使用机器码
+}
+```
+
+### 退货流程
+1. **新建退货单**: 输入原销售单号，系统自动验证并加载顾客信息
+2. **添加退货商品**: 选择或搜索商品，设置退货数量和原因
+3. **验证退货**: 系统验证商品是否属于原销售订单
+4. **保存退货**: 系统自动更新库存，生成退货记录
+5. **状态管理**: 支持退货单的审核、完成和取消操作
+
+### 权限控制
+- **管理员**: 完整的退货管理权限，包括新建、编辑、审核、完成和取消
+- **仓库管理员**: 完整的退货管理权限
+- **收银员**: 无退货管理权限

@@ -397,16 +397,274 @@ namespace market.Services
             return null;
         }
         
+        /// <summary>
+        /// 根据销售单号获取销售明细
+        /// </summary>
+        /// <param name="orderNumber">销售单号</param>
+        /// <returns>销售明细列表</returns>
         public List<SaleOrderItem> GetSaleOrderItems(string orderNumber)
         {
-            // 实现代码...
-            return new List<SaleOrderItem>();
+            var items = new List<SaleOrderItem>();
+            
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    
+                    string query = @"
+                        SELECT 
+                            Id, OrderNumber, ProductCode, ProductName, 
+                            Quantity, SalePrice, Amount, OriginalPrice, DiscountRate
+                        FROM SaleOrderItems 
+                        WHERE OrderNumber = @OrderNumber";
+                    
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@OrderNumber", orderNumber);
+                        
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var item = new SaleOrderItem
+                                {
+                                    Id = reader["Id"]?.ToString() ?? string.Empty,
+                                    OrderNumber = reader["OrderNumber"]?.ToString() ?? string.Empty,
+                                    ProductCode = reader["ProductCode"]?.ToString() ?? string.Empty,
+                                    ProductName = reader["ProductName"]?.ToString() ?? string.Empty,
+                                    Quantity = Convert.ToInt32(reader["Quantity"]),
+                                    SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                    Amount = Convert.ToDecimal(reader["Amount"]),
+                                    OriginalPrice = Convert.ToDecimal(reader["OriginalPrice"]),
+                                    DiscountRate = Convert.ToDecimal(reader["DiscountRate"])
+                                };
+                                
+                                items.Add(item);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"获取销售明细失败: {ex.Message}");
+            }
+            
+            return items;
         }
         
+        /// <summary>
+        /// 分页查询销售订单
+        /// </summary>
+        /// <param name="query">查询条件</param>
+        /// <returns>分页结果</returns>
         public SaleOrderListResult GetSaleOrdersPaged(SaleOrderQuery query)
         {
-            // 实现代码...
-            return new SaleOrderListResult();
+            var result = new SaleOrderListResult();
+            
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    
+                    // 构建查询条件
+                    var conditions = new List<string>();
+                    var parameters = new List<MySqlParameter>();
+                    
+                    if (!string.IsNullOrEmpty(query.OrderNumber))
+                    {
+                        conditions.Add("so.OrderNumber LIKE @OrderNumber");
+                        parameters.Add(new MySqlParameter("@OrderNumber", $"%{query.OrderNumber}%"));
+                    }
+                    
+                    if (!string.IsNullOrEmpty(query.Customer))
+                    {
+                        conditions.Add("so.Customer LIKE @Customer");
+                        parameters.Add(new MySqlParameter("@Customer", $"%{query.Customer}%"));
+                    }
+                    
+                    if (query.Status.HasValue)
+                    {
+                        conditions.Add("so.Status = @Status");
+                        parameters.Add(new MySqlParameter("@Status", (int)query.Status.Value));
+                    }
+                    
+                    if (query.PaymentMethod.HasValue)
+                    {
+                        conditions.Add("so.PaymentMethod = @PaymentMethod");
+                        parameters.Add(new MySqlParameter("@PaymentMethod", (int)query.PaymentMethod.Value));
+                    }
+                    
+                    if (query.StartDate.HasValue)
+                    {
+                        conditions.Add("so.OrderDate >= @StartDate");
+                        parameters.Add(new MySqlParameter("@StartDate", query.StartDate.Value.Date));
+                    }
+                    
+                    if (query.EndDate.HasValue)
+                    {
+                        conditions.Add("so.OrderDate <= @EndDate");
+                        parameters.Add(new MySqlParameter("@EndDate", query.EndDate.Value.Date.AddDays(1).AddSeconds(-1)));
+                    }
+                    
+                    if (!string.IsNullOrEmpty(query.ProductCode))
+                    {
+                        // 使用子查询来避免 DISTINCT 失效的问题
+                        conditions.Add($"so.OrderNumber IN (SELECT DISTINCT OrderNumber FROM SaleOrderItems WHERE ProductCode LIKE @ProductCode)");
+                        parameters.Add(new MySqlParameter("@ProductCode", $"%{query.ProductCode}%"));
+                    }
+                    
+                    string whereClause = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+                    
+                    // 查询总记录数
+                    string countQuery = $"SELECT COUNT(DISTINCT so.OrderNumber) FROM SaleOrders so {whereClause}";
+                    
+                    using (var countCommand = new MySqlCommand(countQuery, connection))
+                    {
+                        foreach (var param in parameters)
+                        {
+                            countCommand.Parameters.Add(param);
+                        }
+                        
+                        result.TotalCount = Convert.ToInt32(countCommand.ExecuteScalar());
+                    }
+                    
+                    // 计算分页信息
+                    result.PageSize = query.PageSize;
+                    result.CurrentPage = query.PageIndex;
+                    result.TotalPages = (int)Math.Ceiling((double)result.TotalCount / query.PageSize);
+                    
+                    // 查询销售订单数据
+                    string dataQuery = @$"
+                        SELECT DISTINCT 
+                            so.OrderNumber, so.OrderDate, so.Customer, so.OperatorId,
+                            COALESCE(u.Username, so.OperatorId) as OperatorName, 
+                            so.Status, so.TotalAmount, so.DiscountAmount,
+                            so.FinalAmount, so.ReceivedAmount, so.ChangeAmount, 
+                            so.PaymentMethod, so.Notes, so.CreatedAt
+                        FROM SaleOrders so 
+                        LEFT JOIN SaleOrderItems soi ON so.OrderNumber = soi.OrderNumber
+                        LEFT JOIN Users u ON so.OperatorId = u.Id
+                        {whereClause}
+                        ORDER BY so.OrderDate DESC, so.OrderNumber DESC
+                        LIMIT @PageSize OFFSET @Offset";
+                    
+                    using (var dataCommand = new MySqlCommand(dataQuery, connection))
+                    {
+                        foreach (var param in parameters)
+                        {
+                            dataCommand.Parameters.Add(param);
+                        }
+                        
+                        dataCommand.Parameters.AddWithValue("@PageSize", query.PageSize);
+                        dataCommand.Parameters.AddWithValue("@Offset", (query.PageIndex - 1) * query.PageSize);
+                        
+                        using (var reader = dataCommand.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var order = new SaleOrder
+                                {
+                                    OrderNumber = reader["OrderNumber"]?.ToString() ?? string.Empty,
+                                    OrderDate = Convert.ToDateTime(reader["OrderDate"]),
+                                    Customer = reader["Customer"]?.ToString() ?? string.Empty,
+                                    OperatorId = reader["OperatorId"]?.ToString() ?? string.Empty,
+                                    OperatorName = reader["OperatorName"]?.ToString() ?? string.Empty,
+                                    Status = (SaleOrderStatus)Convert.ToInt32(reader["Status"]),
+                                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                                    DiscountAmount = Convert.ToDecimal(reader["DiscountAmount"]),
+                                    FinalAmount = Convert.ToDecimal(reader["FinalAmount"]),
+                                    ReceivedAmount = Convert.ToDecimal(reader["ReceivedAmount"]),
+                                    ChangeAmount = Convert.ToDecimal(reader["ChangeAmount"]),
+                                    PaymentMethod = (PaymentMethod)Convert.ToInt32(reader["PaymentMethod"]),
+                                    Notes = reader["Notes"]?.ToString() ?? string.Empty,
+                                    CreatedAt = Convert.ToDateTime(reader["CreatedAt"])
+                                };
+                                
+                                // 获取销售明细
+                                order.Items = GetSaleOrderItems(order.OrderNumber);
+                                
+                                result.Orders.Add(order);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"查询销售订单失败: {ex.Message}");
+            }
+            
+            return result;
+        }
+        
+        /// <summary>
+        /// 根据销售单号获取销售订单
+        /// </summary>
+        /// <param name="orderNumber">销售单号</param>
+        /// <returns>销售订单信息</returns>
+        public SaleOrder GetSaleOrderByNumber(string orderNumber)
+        {
+            try
+            {
+                using (var connection = _databaseService.GetConnection())
+                {
+                    connection.Open();
+                    
+                    string query = @"
+                        SELECT 
+                            so.OrderNumber, so.OrderDate, so.Customer, so.OperatorId,
+                            COALESCE(u.Username, so.OperatorId) as OperatorName, 
+                            so.Status, so.TotalAmount, so.DiscountAmount, so.FinalAmount, 
+                            so.ReceivedAmount, so.ChangeAmount, so.PaymentMethod, 
+                            so.Notes, so.CreatedAt
+                        FROM SaleOrders so
+                        LEFT JOIN Users u ON so.OperatorId = u.Id
+                        WHERE so.OrderNumber = @OrderNumber";
+                    
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@OrderNumber", orderNumber);
+                        
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                var order = new SaleOrder
+                                {
+                                    OrderNumber = reader["OrderNumber"]?.ToString() ?? string.Empty,
+                                    OrderDate = Convert.ToDateTime(reader["OrderDate"]),
+                                    Customer = reader["Customer"]?.ToString() ?? string.Empty,
+                                    OperatorId = reader["OperatorId"]?.ToString() ?? string.Empty,
+                                    OperatorName = reader["OperatorName"]?.ToString() ?? string.Empty,
+                                    Status = (SaleOrderStatus)Convert.ToInt32(reader["Status"]),
+                                    TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
+                                    DiscountAmount = Convert.ToDecimal(reader["DiscountAmount"]),
+                                    FinalAmount = Convert.ToDecimal(reader["FinalAmount"]),
+                                    ReceivedAmount = Convert.ToDecimal(reader["ReceivedAmount"]),
+                                    ChangeAmount = Convert.ToDecimal(reader["ChangeAmount"]),
+                                    PaymentMethod = (PaymentMethod)Convert.ToInt32(reader["PaymentMethod"]),
+                                    Notes = reader["Notes"]?.ToString() ?? string.Empty,
+                                    CreatedAt = Convert.ToDateTime(reader["CreatedAt"])
+                                };
+                                
+                                // 获取销售明细
+                                order.Items = GetSaleOrderItems(orderNumber);
+                                
+                                return order;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"获取销售订单失败: {ex.Message}");
+            }
+            
+            return null;
         }
     }
 }

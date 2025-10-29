@@ -280,6 +280,57 @@ namespace market.Services
                         FOREIGN KEY (ParentId) REFERENCES Categories(Id) ON DELETE SET NULL
                     )";
 
+                // 创建退货订单表
+                var createReturnOrderTable = @"
+                    CREATE TABLE IF NOT EXISTS ReturnOrders (
+                        ReturnNumber VARCHAR(50) PRIMARY KEY,
+                        OriginalOrderNumber VARCHAR(50) NOT NULL,
+                        ReturnDate DATETIME NOT NULL,
+                        Customer VARCHAR(100) NOT NULL,
+                        OperatorId VARCHAR(50) NOT NULL,
+                        Status INT NOT NULL DEFAULT 0,
+                        TotalAmount DECIMAL(18,2) NOT NULL,
+                        RefundAmount DECIMAL(18,2) NOT NULL,
+                        Reason VARCHAR(255),
+                        Notes TEXT,
+                        CreatedAt DATETIME NOT NULL,
+                        FOREIGN KEY (OperatorId) REFERENCES Users(Id),
+                        FOREIGN KEY (OriginalOrderNumber) REFERENCES SaleOrders(OrderNumber)
+                    )";
+
+                // 创建退货订单明细表
+                var createReturnOrderItemsTable = @"
+                    CREATE TABLE IF NOT EXISTS ReturnOrderItems (
+                        Id VARCHAR(50) PRIMARY KEY,
+                        ReturnNumber VARCHAR(50) NOT NULL,
+                        ProductCode VARCHAR(50) NOT NULL,
+                        ProductName VARCHAR(255) NOT NULL,
+                        Quantity INT NOT NULL,
+                        ReturnPrice DECIMAL(18,2) NOT NULL,
+                        Amount DECIMAL(18,2) NOT NULL,
+                        OriginalSalePrice DECIMAL(18,2) NOT NULL,
+                        Reason VARCHAR(255),
+                        FOREIGN KEY (ReturnNumber) REFERENCES ReturnOrders(ReturnNumber),
+                        FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode)
+                    )";
+
+                // 创建退货历史表
+                var createReturnHistoryTable = @"
+                    CREATE TABLE IF NOT EXISTS ReturnHistory (
+                        Id VARCHAR(50) PRIMARY KEY,
+                        ProductCode VARCHAR(50) NOT NULL,
+                        Quantity INT NOT NULL,
+                        ReturnPrice DECIMAL(18,2) NOT NULL,
+                        Amount DECIMAL(18,2) NOT NULL,
+                        ReturnNumber VARCHAR(50),
+                        ReturnDate DATETIME NOT NULL,
+                        OperatorId VARCHAR(50) NOT NULL,
+                        Reason VARCHAR(255),
+                        FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode),
+                        FOREIGN KEY (ReturnNumber) REFERENCES ReturnOrders(ReturnNumber),
+                        FOREIGN KEY (OperatorId) REFERENCES Users(Id)
+                    )";
+
                 // 执行所有创建表的SQL语句
                 ExecuteCreateTable(connection, createUserTable, "Users");
                 ExecuteCreateTable(connection, createSupplierTable, "Suppliers");
@@ -293,6 +344,9 @@ namespace market.Services
                 ExecuteCreateTable(connection, createSaleOrderItemsTable, "SaleOrderItems");
                 ExecuteCreateTable(connection, createSaleHistoryTable, "SaleHistory");
                 ExecuteCreateTable(connection, createProductBarcodesTable, "ProductBarcodes");
+                ExecuteCreateTable(connection, createReturnOrderTable, "ReturnOrders");
+                ExecuteCreateTable(connection, createReturnOrderItemsTable, "ReturnOrderItems");
+                ExecuteCreateTable(connection, createReturnHistoryTable, "ReturnHistory");
 
                 // 初始化默认数据
                 InitializeDefaultData(connection);

@@ -809,7 +809,7 @@ namespace market.Services
                         SELECT p.*, s.Name as SupplierName 
                         FROM Products p 
                         LEFT JOIN Suppliers s ON p.SupplierId = s.Id 
-                        WHERE p.Name LIKE @Keyword";
+                        WHERE (p.Name LIKE @Keyword OR p.ProductCode LIKE @Keyword)";
                     if (!string.IsNullOrEmpty(category))
                     {
                         query += " AND p.Category = @Category";

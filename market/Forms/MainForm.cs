@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using market.Forms;
 using market.Services;
+using market.Models;
 
 namespace market.Forms
 {
@@ -422,12 +423,47 @@ namespace market.Forms
 
         private void ShowReturnManagement()
         {
-            ShowFeatureNotImplemented("退货处理");
+            try
+            {
+                var returnService = new ReturnService(_databaseService, _authService);
+                var productService = new ProductService(_databaseService);
+                var returnForm = new ReturnManagementForm(returnService, _authService, productService);
+                
+                // 清空内容面板并显示退货管理界面
+                _contentPanel.Controls.Clear();
+                returnForm.TopLevel = false;
+                returnForm.FormBorderStyle = FormBorderStyle.None;
+                returnForm.Dock = DockStyle.Fill;
+                _contentPanel.Controls.Add(returnForm);
+                returnForm.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开退货管理失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowSalesRecords()
         {
-            ShowFeatureNotImplemented("销售记录");
+            try
+            {
+                var saleService = new SaleService(_databaseService, _authService);
+                var salesRecordsForm = new SalesRecordsForm(saleService, _authService);
+                
+                // 清空内容面板并显示新窗体
+                _contentPanel.Controls.Clear();
+                salesRecordsForm.TopLevel = false;
+                salesRecordsForm.FormBorderStyle = FormBorderStyle.None;
+                salesRecordsForm.Dock = DockStyle.Fill;
+                _contentPanel.Controls.Add(salesRecordsForm);
+                salesRecordsForm.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开销售记录失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowSalesReport()

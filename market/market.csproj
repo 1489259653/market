@@ -21,6 +21,7 @@
     <PackageReference Include="DirectShowLib" Version="1.0.0" />
     <PackageReference Include="AForge.Video" Version="2.2.5" />
     <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
+    <PackageReference Include="EPPlus" Version="7.0.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,6 +32,7 @@
     <Compile Include="Models\User.cs" />
     <Compile Include="Models\InventoryHistory.cs" />
     <Compile Include="Models\Sale.cs" />
+    <Compile Include="Models\ReturnOrder.cs" />
     <!-- 服务文件 -->
     <Compile Include="Services\DatabaseService.cs" />
     <Compile Include="Services\AuthService.cs" />
@@ -39,6 +41,7 @@
     <Compile Include="Services\CategoryService.cs" />
     <Compile Include="Services\PurchaseService.cs" />
     <Compile Include="Services\SaleService.cs" />
+    <Compile Include="Services\ReturnService.cs" />
     <Compile Include="Services\TestDataService.cs" />
     <Compile Include="Services\MachineCodeService.cs" />
     <!-- 窗体文件 -->
@@ -60,6 +63,14 @@
     <!-- 销售管理窗体文件 -->
     <Compile Include="Forms\SaleCounterForm.cs" />
     <Compile Include="Forms\PaymentForm.cs" />
+    <!-- 退货管理窗体文件 -->
+    <Compile Include="Forms\ReturnManagementForm.cs" />
+    <Compile Include="Forms\ReturnOrderEditForm.cs" />
+    <Compile Include="Forms\ReturnOrderItemEditForm.cs" />
+    <Compile Include="Forms\ReturnOrderViewForm.cs" />
+    <Compile Include="Forms\ProductSearchForm.cs" />
+    <!-- 销售记录窗体文件 -->
+    <Compile Include="Forms\SalesRecordsForm.cs" />
     <!-- 进货服务文件 -->
     <!-- PurchaseService.cs 已在服务文件部分定义，此处不再重复 -->
     <!-- 进货模型文件 -->
@@ -79,6 +90,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Forms\PurchaseOrderViewForm.resx" />
+    <EmbeddedResource Include="Forms\SalesRecordsForm.resx" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
