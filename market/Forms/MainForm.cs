@@ -468,7 +468,24 @@ namespace market.Forms
 
         private void ShowSalesReport()
         {
-            ShowFeatureNotImplemented("销售统计");
+            try
+            {
+                var saleService = new SaleService(_databaseService, _authService);
+                var statisticsForm = new SalesStatisticsForm(saleService, _databaseService);
+                
+                // 清空内容面板并显示新窗体
+                _contentPanel.Controls.Clear();
+                statisticsForm.TopLevel = false;
+                statisticsForm.FormBorderStyle = FormBorderStyle.None;
+                statisticsForm.Dock = DockStyle.Fill;
+                _contentPanel.Controls.Add(statisticsForm);
+                statisticsForm.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"打开销售统计报表失败: {ex.Message}", "错误", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ShowInventoryReport()

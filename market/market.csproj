@@ -23,6 +23,7 @@
     <PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
     <PackageReference Include="EPPlus" Version="7.0.5" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.118.0" />
+
   </ItemGroup>
 
   <ItemGroup>
@@ -75,6 +76,9 @@
     <Compile Include="Forms\ProductSearchForm.cs" />
     <!-- 销售记录窗体文件 -->
     <Compile Include="Forms\SalesRecordsForm.cs" />
+    <!-- 销售统计窗体文件 -->
+    <Compile Include="Forms\SalesStatisticsForm.cs" />
+    <Compile Include="Forms\SalesStatisticsForm.Designer.cs" />
     <!-- 进货服务文件 -->
     <!-- PurchaseService.cs 已在服务文件部分定义，此处不再重复 -->
     <!-- 进货模型文件 -->
