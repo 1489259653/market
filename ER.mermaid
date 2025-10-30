@@ -1,0 +1,115 @@
+erDiagram
+    Users {
+        VARCHAR(50) Id PK
+        VARCHAR(50) Username
+        VARCHAR(50) PasswordHash
+        INT Role
+        BOOLEAN IsActive
+    }
+    
+    Categories {
+        VARCHAR(50) Id PK
+        VARCHAR(255) Name
+        VARCHAR(50) ParentId FK
+        INT Level
+        BOOLEAN IsActive
+    }
+    
+    Suppliers {
+        VARCHAR(50) Id PK
+        VARCHAR(255) Name
+        VARCHAR(255) Address
+        VARCHAR(50) ContactInfo
+    }
+    
+    Products {
+        VARCHAR(50) ProductCode PK
+        VARCHAR(255) Name
+        INT Price
+        INT Quantity
+        VARCHAR(50) CategoryId FK
+        VARCHAR(50) SupplierId FK
+        BOOLEAN IsActive
+    }
+    
+    SaleOrders {
+        VARCHAR(50) OrderNumber PK
+        DATETIME SaleDate
+        VARCHAR(50) OperatorId FK
+        INT TotalAmount
+    }
+    
+    OrderItems {
+        VARCHAR(50) Id PK
+        VARCHAR(50) OrderNumber FK
+        VARCHAR(50) ProductCode FK
+        INT Quantity
+        INT UnitPrice
+    }
+    
+    PurchaseOrders {
+        VARCHAR(50) OrderNumber PK
+        DATETIME OrderDate
+        VARCHAR(50) SupplierId FK
+        VARCHAR(50) OperatorId FK
+        INT Status
+        INT TotalAmount
+    }
+    
+    PurchaseOrderItems {
+        VARCHAR(50) Id PK
+        VARCHAR(50) OrderNumber FK
+        VARCHAR(50) ProductCode FK
+        INT Quantity
+        INT PurchasePrice
+    }
+    
+    ReturnOrders {
+        VARCHAR(50) ReturnNumber PK
+        VARCHAR(50) OriginalOrderNumber FK
+        DATETIME ReturnDate
+        VARCHAR(50) OperatorId FK
+        INT Status
+        INT RefundAmount
+    }
+    
+    ReturnOrderItems {
+        VARCHAR(50) Id PK
+        VARCHAR(50) ReturnNumber FK
+        VARCHAR(50) ProductCode FK
+        INT Quantity
+        INT ReturnPrice
+    }
+    
+    InventoryHistory {
+        VARCHAR(50) Id PK
+        VARCHAR(50) ProductCode FK
+        INT QuantityChange
+        VARCHAR(50) RelatedOrderNumber
+        VARCHAR(50) OperatorId FK
+    }
+    
+    Members {
+        VARCHAR(50) Id PK
+        VARCHAR(100) Name
+        VARCHAR(20) PhoneNumber
+        INT Points
+    }
+
+ 
+    Categories ||--o{ Categories : "has subcategories"
+    Categories ||--o{ Products : "contains"
+    Suppliers ||--o{ Products : "supplies"
+    Suppliers ||--o{ PurchaseOrders : "receives orders from"
+    Users ||--o{ SaleOrders : "processes"
+    Users ||--o{ PurchaseOrders : "creates"
+    Users ||--o{ ReturnOrders : "handles"
+    Products ||--o{ OrderItems : "included in"
+    Products ||--o{ PurchaseOrderItems : "purchased as"
+    Products ||--o{ ReturnOrderItems : "returned as"
+    Products ||--o{ InventoryHistory : "has stock changes"
+    SaleOrders ||--o{ OrderItems : "includes"
+    SaleOrders ||--o{ ReturnOrders : "may have returns"
+    PurchaseOrders ||--o{ PurchaseOrderItems : "includes"
+    ReturnOrders ||--o{ ReturnOrderItems : "includes"
+    SaleOrders }o--|| Members : "associated with"
