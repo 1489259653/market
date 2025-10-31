@@ -5,6 +5,13 @@ using System.Linq;
 using System.Windows.Forms;
 using market.Models;
 using market.Services;
+using System.Media;
+// 使用别名避免命名冲突
+using AForgeLib = AForge;
+using AForgeVideo = AForge.Video;
+using AForgeVideoDirectShow = AForge.Video.DirectShow;
+using ZXing;
+using ZXing.Windows.Compatibility;
 
 namespace market.Forms
 {
@@ -29,6 +36,30 @@ namespace market.Forms
         private TextBox _txtNotes;
         private ComboBox _cmbPaymentMethod;
 
+        // 摄像头扫描相关变量
+        private PictureBox _cameraPictureBox;
+        private System.Threading.Thread _scanThread;
+        private bool _isScanning;
+        private System.Windows.Forms.Timer _scanTimer;
+        private Random _randomBarcodeGenerator;
+        private DateTime _lastScanTime = DateTime.MinValue;
+        private AForgeVideoDirectShow.VideoCaptureDevice _videoSource;
+        private AForgeVideoDirectShow.FilterInfoCollection _videoDevices;
+        private bool _isCameraInitialized = false;
+        private Bitmap _lastFrame; // 存储最后一帧用于条形码识别
+        private BarcodeReader _barcodeReader;
+        
+        // 模拟的条形码数据
+        private readonly string[] _sampleBarcodes = {
+            "6901234567890", // EAN-13
+            "123456789012",   // UPC-A
+            "9780201379624",  // ISBN
+            "6923456789012",  // 商品条码
+            "6934567890123",  // 商品条码
+            "6945678901234",  // 商品条码
+            "6956789012345"   // 商品条码
+        };
+
         public SaleCounterForm(SaleService saleService, AuthService authService)
         {
             _saleService = saleService;
@@ -36,6 +67,25 @@ namespace market.Forms
             
             InitializeComponent();
             InitializeForm();
+            
+            // 初始化条形码解码器
+            _barcodeReader = new ZXing.Windows.Compatibility.BarcodeReader
+            {
+                AutoRotate = true,
+                Options = new ZXing.Common.DecodingOptions
+                {
+                    TryHarder = true,
+                    TryInverted = true,
+                    PossibleFormats = new[] {
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.EAN_8,
+                        ZXing.BarcodeFormat.UPC_A,
+                        ZXing.BarcodeFormat.UPC_E,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39
+                    }
+                }
+            };
         }
 
         private void InitializeComponent()
@@ -54,7 +104,7 @@ namespace market.Forms
             mainPanel.ColumnCount = 1;
             
             // 设置行高比例：输入面板固定高度，购物车面板填充剩余空间，结算面板固定高度
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 100)); // 输入面板
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 150)); // 输入面板
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // 购物车面板（填充剩余空间）
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 200)); // 结算面板
 
@@ -81,7 +131,7 @@ namespace market.Forms
             var panel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 100,
+                Height = 400, // 增加高度以容纳摄像头显示框
                 BorderStyle = BorderStyle.FixedSingle
             };
 
@@ -95,23 +145,33 @@ namespace market.Forms
 
             // 添加按钮
             var btnAdd = new Button { Text = "添加商品", Location = new Point(500, 10), Size = new Size(80, 30) };
-            var btnScan = new Button { Text = "扫描", Location = new Point(590, 10), Size = new Size(60, 30) };
+
+            // 摄像头显示框（替换原来的扫描按钮位置）
+            var picCamera = new PictureBox
+            {
+                Location = new Point(600, 0),
+                Size = new Size(400, 150),
+                BackColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle
+            };
 
             // 快速商品按钮
-            var btnQuickProduct1 = new Button { Text = "商品A", Location = new Point(10, 50), Size = new Size(80, 30) };
-            var btnQuickProduct2 = new Button { Text = "商品B", Location = new Point(100, 50), Size = new Size(80, 30) };
-            var btnQuickProduct3 = new Button { Text = "商品C", Location = new Point(190, 50), Size = new Size(80, 30) };
+            var btnQuickProduct1 = new Button { Text = "商品A", Location = new Point(450, 120), Size = new Size(80, 30) };
+            var btnQuickProduct2 = new Button { Text = "商品B", Location = new Point(540, 120), Size = new Size(80, 30) };
+            var btnQuickProduct3 = new Button { Text = "商品C", Location = new Point(630, 120), Size = new Size(80, 30) };
 
             panel.Controls.AddRange(new Control[] {
                 lblProductCode, _txtProductCode,
                 lblQuantity, _numQuantity,
-                btnAdd, btnScan,
+                btnAdd,
+                picCamera,
                 btnQuickProduct1, btnQuickProduct2, btnQuickProduct3
             });
 
             // 事件处理
             btnAdd.Click += (s, e) => AddProductToCart();
-            btnScan.Click += (s, e) => ScanBarcode();
+            
+            // 商品编码输入框回车事件
             _txtProductCode.KeyPress += (s, e) =>
             {
                 if (e.KeyChar == (char)Keys.Enter)
@@ -120,6 +180,9 @@ namespace market.Forms
                     e.Handled = true;
                 }
             };
+
+            // 初始化摄像头扫描功能
+            InitializeCameraScanner(picCamera);
 
             return panel;
         }
@@ -590,7 +653,487 @@ namespace market.Forms
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            _txtProductCode.Focus();
+            // 自动启动摄像头扫描
+            StartCameraScan();
+        }
+
+        private void InitializeCameraScanner(PictureBox cameraPictureBox)
+        {
+            _cameraPictureBox = cameraPictureBox;
+            _randomBarcodeGenerator = new Random();
+            
+            // 初始化扫描计时器
+            _scanTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 1000 // 每1秒检查一次
+            };
+            _scanTimer.Tick += (s, e) => ProcessCameraFrame();
+            
+            // 初始化条形码扫描需要的变量
+            _lastFrame = null;
+            
+            // 初始化摄像头设备列表
+            try
+            {
+                _videoDevices = new AForgeVideoDirectShow.FilterInfoCollection(AForgeVideoDirectShow.FilterCategory.VideoInputDevice);
+                _isCameraInitialized = _videoDevices.Count > 0;
+                
+                if (_isCameraInitialized)
+                {
+                    UpdateCameraStatus("摄像头准备就绪\n请对准条形码");
+                }
+                else
+                {
+                    UpdateCameraStatus("未检测到摄像头设备\n请检查设备连接");
+                }
+            }
+            catch (Exception ex)
+            {
+                _isCameraInitialized = false;
+                UpdateCameraStatus($"摄像头初始化失败: {ex.Message}");
+            }
+        }
+
+
+        private void StartCameraScan()
+        {
+            try
+            {
+                // 停止之前可能运行的扫描
+                StopCameraScan();
+
+                _isScanning = true;
+                
+                if (_isCameraInitialized && _videoDevices.Count > 0)
+                {
+                    // 使用第一个可用的摄像头设备
+                    _videoSource = new AForgeVideoDirectShow.VideoCaptureDevice(_videoDevices[0].MonikerString);
+                    
+                    // 设置视频分辨率为VGA级别，降低内存占用
+                    if (_videoSource.VideoCapabilities.Length > 0)
+                    {
+                        var bestResolution = _videoSource.VideoCapabilities
+                            .Where(cap => cap.FrameSize.Width <= 640 && cap.FrameSize.Height <= 480)
+                            .OrderByDescending(cap => cap.FrameSize.Width * cap.FrameSize.Height)
+                            .FirstOrDefault() ?? _videoSource.VideoCapabilities[0];
+                        if (bestResolution != null)
+                        {
+                            _videoSource.VideoResolution = bestResolution;
+                        }
+                    }
+                    
+                    // 注册视频帧事件处理
+                    _videoSource.NewFrame += VideoSource_NewFrame;
+                    
+                    // 启动视频捕获
+                    _videoSource.Start();
+                    
+                    // 启动扫描线程进行条形码识别
+                    _scanThread = new System.Threading.Thread(ScanLoop)
+                    {
+                        Name = "BarcodeScanThread",
+                        IsBackground = true
+                    };
+                    _scanThread.Start();
+                    
+                    UpdateCameraStatus("扫描已启动\n请将条形码对准摄像头");
+                }
+                else
+                {
+                    // 如果没有摄像头设备，使用模拟模式
+                    _scanTimer.Start();
+                    UpdateCameraStatus("未检测到摄像头\n进入模拟扫描模式");
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateCameraStatus($"启动扫描失败: {ex.Message}");
+                _isScanning = false;
+            }
+        }
+
+        private void StopCameraScan()
+        {
+            try
+            {
+                _isScanning = false;
+                
+                // 停止扫描线程
+                if (_scanThread != null && _scanThread.IsAlive)
+                {
+                    _scanThread.Join(1000); // 等待线程结束
+                    _scanThread = null;
+                }
+                
+                // 停止计时器
+                if (_scanTimer != null)
+                {
+                    _scanTimer.Stop();
+                }
+                
+                // 停止视频源
+                if (_videoSource != null && _videoSource.IsRunning)
+                {
+                    _videoSource.SignalToStop();
+                    _videoSource.WaitForStop(); // 移除参数，因为该方法没有接受参数的重载
+                    _videoSource = null;
+                }
+                
+                // 释放_lastFrame资源
+                lock (this)
+                {
+                    if (_lastFrame != null)
+                    {
+                        _lastFrame.Dispose();
+                        _lastFrame = null;
+                    }
+                }
+                
+                // 清空摄像头图像
+                if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                {
+                    SafeUpdateCameraImage(null);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"停止摄像头扫描异常: {ex.Message}");
+            }
+        }
+
+        private void UpdateCameraStatus(string status)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => UpdateCameraStatus(status)));
+                return;
+            }
+
+            // 在摄像头画面上显示状态信息
+            if (_cameraPictureBox != null && !this.IsDisposed)
+            {
+                using (var bitmap = new Bitmap(_cameraPictureBox.Width, _cameraPictureBox.Height))
+                using (var graphics = Graphics.FromImage(bitmap))
+                {
+                    graphics.Clear(Color.Black);
+                    
+                    using (var font = new Font("微软雅黑", 12, FontStyle.Bold))
+                    using (var brush = new SolidBrush(Color.White))
+                    {
+                        var textSize = graphics.MeasureString(status, font);
+                        var x = (bitmap.Width - textSize.Width) / 2;
+                        var y = (bitmap.Height - textSize.Height) / 2;
+                        
+                        graphics.DrawString(status, font, brush, x, y);
+                    }
+                    
+                    if (_cameraPictureBox.Image != null)
+                    {
+                        _cameraPictureBox.Image.Dispose();
+                    }
+                    _cameraPictureBox.Image = new Bitmap(bitmap);
+                }
+            }
+        }
+
+        private void ProcessCameraFrame()
+        {
+            if (!_isScanning || this.IsDisposed)
+                return;
+
+            try
+            {
+                // 只有在没有使用真实摄像头时才运行模拟模式
+                if (_videoSource == null || !_videoSource.IsRunning)
+                {
+                    UpdateCameraStatus("模拟扫描中...\n请使用真实摄像头以获得最佳体验");
+                    
+                    // 创建一个简单的扫描动画效果
+                    if (_cameraPictureBox != null && !this.IsDisposed)
+                    {
+                        using (var bitmap = new Bitmap(_cameraPictureBox.Width, _cameraPictureBox.Height))
+                        using (var graphics = Graphics.FromImage(bitmap))
+                        {
+                            graphics.Clear(Color.Black);
+                            
+                            // 绘制扫描线动画
+                            using (var pen = new Pen(Color.Lime, 2))
+                            {
+                                var scanY = (DateTime.Now.Millisecond % 1000) * bitmap.Height / 1000;
+                                graphics.DrawLine(pen, 0, scanY, bitmap.Width, scanY);
+                            }
+                            
+                            // 更新画面
+                            if (_cameraPictureBox.InvokeRequired)
+                            {
+                                _cameraPictureBox.Invoke(new Action<Bitmap>((bmp) =>
+                                {
+                                    if (_cameraPictureBox.Image != null)
+                                        _cameraPictureBox.Image.Dispose();
+                                    _cameraPictureBox.Image = new Bitmap(bmp);
+                                }), bitmap);
+                            }
+                            else
+                            {
+                                if (_cameraPictureBox.Image != null)
+                                    _cameraPictureBox.Image.Dispose();
+                                _cameraPictureBox.Image = new Bitmap(bitmap);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 忽略处理异常
+                System.Diagnostics.Debug.WriteLine($"扫描处理异常: {ex.Message}");
+            }
+        }
+        
+        private void ScanLoop()
+        {
+            // 控制扫描频率，避免过高的CPU使用率
+            var scanInterval = TimeSpan.FromMilliseconds(200); // 每200ms扫描一次
+            var lastScanTime = DateTime.Now;
+            
+            while (_isScanning && !this.IsDisposed)
+            {
+                try
+                {
+                    // 控制扫描频率
+                    var now = DateTime.Now;
+                    if (now - lastScanTime < scanInterval)
+                    {
+                        System.Threading.Thread.Sleep(10);
+                        continue;
+                    }
+                    lastScanTime = now;
+                    
+                    Bitmap bitmap = null;
+                    try
+                    {
+                        // 安全地获取当前图像
+                        lock (this)
+                        {
+                            if (_lastFrame != null)
+                            {
+                                bitmap = (Bitmap)_lastFrame.Clone();
+                            }
+                        }
+                        
+                        if (bitmap != null)
+                        {
+                            // 尝试解码条形码
+                            var result = _barcodeReader.Decode(bitmap);
+                            
+                            if (result != null && !string.IsNullOrEmpty(result.Text))
+                            {
+                                // 扫描成功
+                                string barcode = result.Text;
+                                
+                                // 防止短时间内重复扫描相同的条形码
+                                if (DateTime.Now - _lastScanTime >= TimeSpan.FromSeconds(2))
+                                {
+                                    if (!this.IsDisposed)
+                                    {
+                                        this.Invoke(new Action<string>((barcodeValue) =>
+                                        {
+                                            if (!this.IsDisposed)
+                                            {
+                                                HandleScannedBarcode(barcodeValue);
+                                            }
+                                        }), barcode);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        // 确保bitmap被释放
+                        bitmap?.Dispose();
+                    }
+                    
+                    // 短暂暂停以减少CPU使用率
+                    System.Threading.Thread.Sleep(10);
+                }
+                catch (Exception ex)
+                {
+                    // 忽略扫描过程中的其他错误
+                    System.Diagnostics.Debug.WriteLine($"条形码扫描异常: {ex.Message}");
+                    System.Threading.Thread.Sleep(50);
+                }
+            }
+        }
+        
+        private void ProcessCameraFrame(Bitmap bitmap)
+        {
+            // 这里可以添加图像处理逻辑
+            // 实际的条形码扫描在ScanLoop线程中进行
+        }
+        
+        private void VideoSource_NewFrame(object sender, AForgeVideo.NewFrameEventArgs eventArgs)
+        {
+            if (this.IsDisposed || _cameraPictureBox == null || _cameraPictureBox.IsDisposed)
+                return;
+            
+            // 复制帧以避免并发问题
+            Bitmap bitmap = null;
+            try
+            {
+                bitmap = (Bitmap)eventArgs.Frame.Clone();
+                
+                // 存储最新帧用于扫描
+                lock (this)
+                {
+                    if (_lastFrame != null)
+                    {
+                        _lastFrame.Dispose();
+                    }
+                    _lastFrame = bitmap;
+                    bitmap = null; // 不再需要这个引用，因为已经复制到_lastFrame
+                }
+                
+                // 使用_lastFrame的副本进行UI更新
+                SafeUpdateCameraImage(new Bitmap(_lastFrame));
+                
+                // 处理摄像头帧（可用于添加图像处理逻辑）
+                ProcessCameraFrame(new Bitmap(_lastFrame));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"处理视频帧异常: {ex.Message}");
+                if (bitmap != null)
+                {
+                    bitmap.Dispose();
+                }
+            }
+        }
+        
+        private void SafeUpdateCameraImage(Bitmap newImage)
+        {
+            try
+            {
+                if (_cameraPictureBox == null || this.IsDisposed)
+                {
+                    newImage?.Dispose();
+                    return;
+                }
+                
+                // 释放旧图像资源
+                if (_cameraPictureBox.Image != null)
+                {
+                    try
+                    {
+                        _cameraPictureBox.Image.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"释放旧图像失败: {ex.Message}");
+                    }
+                }
+                
+                // 设置新图像
+                _cameraPictureBox.Image = newImage;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"更新摄像头图像失败: {ex.Message}");
+                newImage?.Dispose();
+            }
+        }
+
+        private void HandleScannedBarcode(string barcode)
+        {
+            try
+            {
+                // 清理条形码，移除可能的空格
+                barcode = barcode?.Trim();
+                if (string.IsNullOrEmpty(barcode))
+                {
+                    return;
+                }
+
+                // 防止重复扫描相同的条形码（2秒内）
+                if (DateTime.Now - _lastScanTime < TimeSpan.FromSeconds(2))
+                {
+                    return;
+                }
+                _lastScanTime = DateTime.Now;
+                
+                // 显示扫描到的条形码（调试用）
+                System.Diagnostics.Debug.WriteLine($"扫描到条形码: {barcode}");
+
+                // 先验证商品是否存在，避免不必要的弹窗
+                Product product = _saleService.GetProductByBarcode(barcode);
+                if (product == null)
+                {
+                    // 商品不存在，静默处理
+                    UpdateCameraStatus($"未识别到有效商品\n条形码: {barcode}");
+                }
+                else
+                {
+                    // 商品存在，自动添加到购物车
+                    _txtProductCode.Text = barcode;
+                    
+                    // 检查库存
+                    int quantity = (int)_numQuantity.Value;
+                    if (_saleService.CheckStock(product.ProductCode, quantity))
+                    {
+                        // 添加商品到购物车
+                        var existingItem = _cartItems.FirstOrDefault(item => item.ProductCode == product.ProductCode);
+                        if (existingItem != null)
+                        {
+                            existingItem.Quantity += quantity;
+                            existingItem.CalculateAmount();
+                        }
+                        else
+                        {
+                            var cartItem = new CartItem
+                            {
+                                ProductCode = product.ProductCode,
+                                ProductName = product.Name,
+                                Quantity = quantity,
+                                SalePrice = product.Price,
+                                IsWeight = false
+                            };
+                            cartItem.CalculateAmount();
+                            _cartItems.Add(cartItem);
+                        }
+
+                        // 更新显示
+                        RefreshCartDisplay();
+                        CalculateAmounts();
+
+                        // 清空输入框
+                        _txtProductCode.Text = "";
+                        _numQuantity.Value = 1;
+
+                        // 只在成功添加时播放轻柔提示音
+                        try
+                        {
+                            System.Media.SystemSounds.Asterisk.Play(); // 更轻柔的提示音
+                        }
+                        catch { }
+
+                        UpdateCameraStatus($"商品添加成功\n{product.Name} x{quantity}");
+                    }
+                    else
+                    {
+                        UpdateCameraStatus($"库存不足\n{product.Name}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateCameraStatus($"扫描失败: {ex.Message}");
+            }
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            base.OnFormClosed(e);
+            StopCameraScan();
         }
     }
 }

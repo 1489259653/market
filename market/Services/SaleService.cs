@@ -316,9 +316,9 @@ namespace market.Services
 
                 return null;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                throw new Exception($"获取商品信息失败");
+                throw new Exception($"获取商品信息失败: {e.Message}");
             }
         }
 
@@ -335,12 +335,12 @@ namespace market.Services
                 {
                     connection.Open();
                     
+                    // 直接在Products表的ProductCode列中查找条形码
                     string query = @"
-                        SELECT p.ProductCode, p.Name, p.Price, p.Quantity, p.Unit, p.Category,
-                               p.SupplierId, p.PurchasePrice, p.StockAlertThreshold, p.IsActive
-                        FROM Products p
-                        LEFT JOIN ProductBarcodes pb ON p.ProductCode = pb.ProductCode
-                        WHERE pb.Barcode = @Barcode AND p.IsActive = TRUE";
+                        SELECT ProductCode, Name, Price, Quantity, Unit, Category, 
+                               SupplierId, PurchasePrice, StockAlertThreshold, IsActive
+                        FROM Products 
+                        WHERE ProductCode = @Barcode AND IsActive = TRUE";
 
                     using (var command = new MySqlCommand(query, connection))
                     {
