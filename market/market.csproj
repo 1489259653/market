@@ -103,6 +103,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Forms\MainForm.resx" />
     <EmbeddedResource Include="Forms\PurchaseOrderViewForm.resx" />
     <EmbeddedResource Include="Forms\SalesRecordsForm.resx" />
     <EmbeddedResource Include="Properties\Resources.resx">

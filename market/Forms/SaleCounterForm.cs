@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using market.Models;
@@ -150,15 +151,15 @@ namespace market.Forms
             var picCamera = new PictureBox
             {
                 Location = new Point(600, 0),
-                Size = new Size(400, 150),
+                Size = new Size(400, 143),
                 BackColor = Color.Black,
                 BorderStyle = BorderStyle.FixedSingle
             };
 
             // 快速商品按钮
-            var btnQuickProduct1 = new Button { Text = "商品A", Location = new Point(450, 120), Size = new Size(80, 30) };
-            var btnQuickProduct2 = new Button { Text = "商品B", Location = new Point(540, 120), Size = new Size(80, 30) };
-            var btnQuickProduct3 = new Button { Text = "商品C", Location = new Point(630, 120), Size = new Size(80, 30) };
+            var btnQuickProduct1 = new Button { Text = "商品A", Location = new Point(130, 40), Size = new Size(80, 30) };
+            var btnQuickProduct2 = new Button { Text = "商品B", Location = new Point(210, 40), Size = new Size(80, 30) };
+            var btnQuickProduct3 = new Button { Text = "商品C", Location = new Point(290, 40), Size = new Size(80, 30) };
 
             panel.Controls.AddRange(new Control[] {
                 lblProductCode, _txtProductCode,
@@ -1033,7 +1034,36 @@ namespace market.Forms
                     }
                 }
                 
-                // 设置新图像
+                // 对图像进行水平翻转（镜像）处理
+                if (newImage != null)
+                {
+                    using (Graphics g = Graphics.FromImage(newImage))
+                    {
+                        // 保存当前状态并获取状态对象
+                        GraphicsState state = g.Save();
+                        
+                        // 设置变换矩阵 - 水平翻转
+                        g.ScaleTransform(-1.0f, 1.0f);
+                        
+                        // 创建临时图像用于绘制
+                        using (Bitmap tempImage = new Bitmap(newImage.Width, newImage.Height))
+                        {
+                            // 将原始图像内容复制到临时图像
+                            using (Graphics tempG = Graphics.FromImage(tempImage))
+                            {
+                                tempG.DrawImageUnscaled(newImage, 0, 0);
+                            }
+                            
+                            // 以镜像方式绘制回原始图像
+                            g.DrawImage(tempImage, -newImage.Width, 0);
+                        }
+                        
+                        // 恢复图形状态
+                        g.Restore(state);
+                    }
+                }
+                
+                // 设置镜像后的图像
                 _cameraPictureBox.Image = newImage;
             }
             catch (Exception ex)
