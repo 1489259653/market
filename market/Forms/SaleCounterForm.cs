@@ -952,10 +952,29 @@ namespace market.Forms
             {
                 _isScanning = false;
                 
-                // 停止扫描线程
-                if (_scanThread != null && _scanThread.IsAlive)
+                // 停止扫描线程（使用更安全的停止方式）
+                if (_scanThread != null)
                 {
-                    _scanThread.Join(1000); // 等待线程结束
+                    // 设置扫描停止标志
+                    _isScanning = false;
+                    
+                    // 尝试优雅地停止线程
+                    if (_scanThread.IsAlive)
+                    {
+                        // 给线程一点时间自己结束
+                        if (!_scanThread.Join(500)) // 只等待500ms
+                        {
+                            // 如果线程没有及时结束，强制中断（但要确保安全）
+                            try
+                            {
+                                _scanThread.Interrupt();
+                            }
+                            catch
+                            {
+                                // 忽略中断异常
+                            }
+                        }
+                    }
                     _scanThread = null;
                 }
                 
@@ -963,14 +982,35 @@ namespace market.Forms
                 if (_scanTimer != null)
                 {
                     _scanTimer.Stop();
+                    _scanTimer.Dispose();
+                    _scanTimer = null;
                 }
                 
                 // 停止视频源
-                if (_videoSource != null && _videoSource.IsRunning)
+                if (_videoSource != null)
                 {
-                    _videoSource.SignalToStop();
-                    _videoSource.WaitForStop(); // 移除参数，因为该方法没有接受参数的重载
-                    _videoSource = null;
+                    try
+                    {
+                        if (_videoSource.IsRunning)
+                        {
+                            _videoSource.SignalToStop();
+                            
+                            // 等待视频源停止，但不要无限等待
+                            for (int i = 0; i < 10; i++) // 最多等待1秒
+                            {
+                                if (!_videoSource.IsRunning)
+                                    break;
+                                System.Threading.Thread.Sleep(100);
+                            }
+                        }
+                        _videoSource.NewFrame -= VideoSource_NewFrame;
+                        _videoSource = null;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"停止视频源异常: {ex.Message}");
+                        _videoSource = null;
+                    }
                 }
                 
                 // 释放_lastFrame资源
@@ -1032,7 +1072,7 @@ namespace market.Forms
 
         private void ProcessCameraFrame()
         {
-            if (!_isScanning || this.IsDisposed)
+            if (!_isScanning || this.IsDisposed || this.IsDisposed)
                 return;
 
             try
@@ -1043,7 +1083,7 @@ namespace market.Forms
                     UpdateCameraStatus("模拟扫描中...\n请使用真实摄像头以获得最佳体验");
                     
                     // 创建一个简单的扫描动画效果
-                    if (_cameraPictureBox != null && !this.IsDisposed)
+                    if (_cameraPictureBox != null && !this.IsDisposed && !_cameraPictureBox.IsDisposed)
                     {
                         using (var bitmap = new Bitmap(_cameraPictureBox.Width, _cameraPictureBox.Height))
                         using (var graphics = Graphics.FromImage(bitmap))
@@ -1062,16 +1102,22 @@ namespace market.Forms
                             {
                                 _cameraPictureBox.Invoke(new Action<Bitmap>((bmp) =>
                                 {
-                                    if (_cameraPictureBox.Image != null)
-                                        _cameraPictureBox.Image.Dispose();
-                                    _cameraPictureBox.Image = new Bitmap(bmp);
+                                    if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                                    {
+                                        if (_cameraPictureBox.Image != null)
+                                            _cameraPictureBox.Image.Dispose();
+                                        _cameraPictureBox.Image = new Bitmap(bmp);
+                                    }
                                 }), bitmap);
                             }
                             else
                             {
-                                if (_cameraPictureBox.Image != null)
-                                    _cameraPictureBox.Image.Dispose();
-                                _cameraPictureBox.Image = new Bitmap(bitmap);
+                                if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                                {
+                                    if (_cameraPictureBox.Image != null)
+                                        _cameraPictureBox.Image.Dispose();
+                                    _cameraPictureBox.Image = new Bitmap(bitmap);
+                                }
                             }
                         }
                     }
@@ -1094,11 +1140,15 @@ namespace market.Forms
             {
                 try
                 {
+                    // 更频繁地检查退出条件
+                    if (!_isScanning || this.IsDisposed)
+                        break;
+                        
                     // 控制扫描频率
                     var now = DateTime.Now;
                     if (now - lastScanTime < scanInterval)
                     {
-                        System.Threading.Thread.Sleep(10);
+                        System.Threading.Thread.Sleep(20); // 稍微增加睡眠时间
                         continue;
                     }
                     lastScanTime = now;
@@ -1151,6 +1201,11 @@ namespace market.Forms
                     // 短暂暂停以减少CPU使用率
                     System.Threading.Thread.Sleep(10);
                 }
+                catch (ThreadInterruptedException)
+                {
+                    // 线程被中断，正常退出
+                    break;
+                }
                 catch (Exception ex)
                 {
                     // 忽略扫描过程中的其他错误
@@ -1158,6 +1213,8 @@ namespace market.Forms
                     System.Threading.Thread.Sleep(50);
                 }
             }
+            
+            System.Diagnostics.Debug.WriteLine("扫描线程已安全退出");
         }
         
         private void ProcessCameraFrame(Bitmap bitmap)
@@ -1388,10 +1445,61 @@ namespace market.Forms
             }
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            try
+            {
+                // 在窗体关闭前停止所有后台任务
+                StopCameraScan();
+                
+                // 确保所有事件处理程序被取消订阅
+                if (_videoSource != null)
+                {
+                    _videoSource.NewFrame -= VideoSource_NewFrame;
+                }
+                
+                // 释放UI资源
+                if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                {
+                    if (_cameraPictureBox.Image != null)
+                    {
+                        var oldImage = _cameraPictureBox.Image;
+                        _cameraPictureBox.Image = null;
+                        oldImage.Dispose();
+                    }
+                }
+                
+                base.OnFormClosing(e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"窗体关闭异常: {ex.Message}");
+                base.OnFormClosing(e);
+            }
+        }
+
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            base.OnFormClosed(e);
-            StopCameraScan();
+            try
+            {
+                // 确保所有资源被释放
+                StopCameraScan();
+                
+                // 清理其他可能的资源
+                if (_scanTimer != null)
+                {
+                    _scanTimer.Stop();
+                    _scanTimer.Dispose();
+                    _scanTimer = null;
+                }
+                
+                base.OnFormClosed(e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"窗体关闭后清理异常: {ex.Message}");
+                base.OnFormClosed(e);
+            }
         }
     }
 }
