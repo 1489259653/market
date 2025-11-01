@@ -75,6 +75,9 @@ namespace market.Forms
             InitializeComponent();
             InitializeForm();
             
+            // 添加FormClosing事件处理，确保窗口关闭时释放资源
+            this.FormClosing += SaleCounterForm_FormClosing;
+            
             // 初始化条形码解码器
             _barcodeReader = new ZXing.Windows.Compatibility.BarcodeReader
             {
@@ -93,6 +96,19 @@ namespace market.Forms
                     }
                 }
             };
+        }
+        
+        private void SaleCounterForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // 停止摄像头扫描，释放所有相关资源
+            StopCameraScan();
+            
+            // 释放_timer资源
+            if (_scanTimer != null)
+            {
+                _scanTimer.Dispose();
+                _scanTimer = null;
+            }
         }
 
         private void InitializeComponent()
@@ -635,6 +651,8 @@ namespace market.Forms
                 {
                     _txtCustomer.Text = _selectedMember.Name;
                     _lblMemberLevel.Text = $"{GetLevelName(_selectedMember.Level)}";
+                    
+                    // 重新计算所有购物车商品的折扣
                     CalculateAmounts();
                 }
             }
