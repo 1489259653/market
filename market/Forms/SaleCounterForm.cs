@@ -20,6 +20,8 @@ namespace market.Forms
     {
         private readonly SaleService _saleService;
         private readonly AuthService _authService;
+        private readonly MemberService _memberService;
+        private Member _selectedMember = null;
         
         private List<CartItem> _cartItems = new List<CartItem>();
         private decimal _totalAmount = 0;
@@ -36,6 +38,9 @@ namespace market.Forms
         private TextBox _txtCustomer;
         private TextBox _txtNotes;
         private ComboBox _cmbPaymentMethod;
+        private Label _lblMemberLevel;
+        private ListBox _lbxMemberSearchResults;
+        private bool _isSearching = false;
 
         // 摄像头扫描相关变量
         private PictureBox _cameraPictureBox;
@@ -61,10 +66,11 @@ namespace market.Forms
             "6956789012345"   // 商品条码
         };
 
-        public SaleCounterForm(SaleService saleService, AuthService authService)
+        public SaleCounterForm(SaleService saleService, AuthService authService, MemberService memberService)
         {
             _saleService = saleService;
             _authService = authService;
+            _memberService = memberService;
             
             InitializeComponent();
             InitializeForm();
@@ -284,18 +290,23 @@ namespace market.Forms
             _lblFinalAmount = new Label { Location = new Point(560, 15), Width = 120, Text = "￥0.00", Font = new Font("微软雅黑", 14, FontStyle.Bold), ForeColor = Color.Blue };
 
             // 顾客信息
-            var lblCustomer = new Label { Text = "顾客姓名:", Location = new Point(10, 50), Width = 80 };
-            _txtCustomer = new TextBox { Location = new Point(90, 47), Width = 150, Text = "散客" };
-
+            var lblCustomer = new Label { Text = "会员搜索:", Location = new Point(10, 50), Width = 80 };
+            _txtCustomer = new TextBox { Location = new Point(90, 47), Width = 150, Text = "" };
+            _lblMemberLevel = new Label { Location = new Point(250, 47), Width = 100, Text = "", Font = new Font(Font, FontStyle.Bold) };
+            
+            // 会员搜索结果下拉框
+            _lbxMemberSearchResults = new ListBox { Location = new Point(90, 67), Width = 150, Height = 100, Visible = false };
+            _lbxMemberSearchResults.Click += (s, e) => SelectMemberFromList();
+            
             // 支付方式
-            var lblPaymentMethod = new Label { Text = "支付方式:", Location = new Point(270, 50), Width = 80 };
-            _cmbPaymentMethod = new ComboBox { Location = new Point(350, 47), Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblPaymentMethod = new Label { Text = "支付方式:", Location = new Point(360, 50), Width = 80 };
+            _cmbPaymentMethod = new ComboBox { Location = new Point(440, 47), Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
             _cmbPaymentMethod.Items.AddRange(new object[] { "现金", "微信支付", "支付宝", "银行卡" });
             _cmbPaymentMethod.SelectedIndex = 0;
 
             // 备注
-            var lblNotes = new Label { Text = "备注:", Location = new Point(500, 50), Width = 50 };
-            _txtNotes = new TextBox { Location = new Point(550, 47), Width = 300 };
+            var lblNotes = new Label { Text = "备注:", Location = new Point(570, 50), Width = 50 };
+            _txtNotes = new TextBox { Location = new Point(620, 47), Width = 300 };
 
             // 结算按钮
             var btnSettle = new Button { Text = "结算", Location = new Point(10, 90), Size = new Size(100, 40), 
@@ -307,7 +318,8 @@ namespace market.Forms
                 lblTotalAmount, _lblTotalAmount,
                 lblDiscountAmount, _lblDiscountAmount,
                 lblFinalAmount, _lblFinalAmount,
-                lblCustomer, _txtCustomer,
+                lblCustomer, _txtCustomer, _lblMemberLevel,
+                _lbxMemberSearchResults,
                 lblPaymentMethod, _cmbPaymentMethod,
                 lblNotes, _txtNotes,
                 btnSettle, btnCancel, btnPrint
@@ -317,6 +329,25 @@ namespace market.Forms
             btnSettle.Click += (s, e) => SettleSale();
             btnCancel.Click += (s, e) => this.Close();
             btnPrint.Click += (s, e) => PrintReceipt();
+            
+            // 会员搜索事件
+            _txtCustomer.TextChanged += (s, e) => SearchMember();
+            _txtCustomer.LostFocus += (s, e) => {
+                // 延迟隐藏搜索结果，以便用户可以点击选择
+                var timer = new System.Windows.Forms.Timer();
+                timer.Interval = 200;
+                timer.Tick += (timerS, timerE) => {
+                    _lbxMemberSearchResults.Visible = false;
+                    timer.Stop();
+                    timer.Dispose();
+                };
+                timer.Start();
+            };
+            _txtCustomer.GotFocus += (s, e) => {
+                if (!string.IsNullOrEmpty(_txtCustomer.Text) && _lbxMemberSearchResults.Items.Count > 0) {
+                    _lbxMemberSearchResults.Visible = true;
+                }
+            };
 
             return panel;
         }
@@ -518,11 +549,123 @@ namespace market.Forms
         private void CalculateAmounts()
         {
             _totalAmount = _cartItems.Sum(item => item.Amount);
+            
+            // 根据会员等级计算折扣
+            if (_selectedMember != null)
+            {
+                _discountAmount = CalculateMemberDiscount(_totalAmount, _selectedMember.Level);
+            }
+            else
+            {
+                _discountAmount = 0;
+            }
+            
             _finalAmount = _totalAmount - _discountAmount;
 
             _lblTotalAmount.Text = $"￥{_totalAmount:F2}";
             _lblDiscountAmount.Text = $"￥{_discountAmount:F2}";
             _lblFinalAmount.Text = $"￥{_finalAmount:F2}";
+        }
+        
+        private decimal CalculateMemberDiscount(decimal amount, MemberLevel level)
+        {
+            // 根据会员等级设置折扣率
+            switch (level)
+            {
+                case MemberLevel.Bronze: // 铜牌会员 98折
+                    return amount * 0.02m;
+                case MemberLevel.Silver: // 银牌会员 95折
+                    return amount * 0.05m;
+                case MemberLevel.Gold: // 金牌会员 9折
+                    return amount * 0.1m;
+                case MemberLevel.Platinum: // 铂金会员 85折
+                    return amount * 0.15m;
+                default:
+                    return 0;
+            }
+        }
+        
+        private void SearchMember()
+        {
+            if (_isSearching) return;
+            
+            _isSearching = true;
+            string keyword = _txtCustomer.Text.Trim();
+            
+            if (string.IsNullOrEmpty(keyword))
+            {
+                _lbxMemberSearchResults.Items.Clear();
+                _lbxMemberSearchResults.Visible = false;
+                _selectedMember = null;
+                _lblMemberLevel.Text = "";
+                CalculateAmounts();
+                _isSearching = false;
+                return;
+            }
+            
+            // 搜索会员（这里需要扩展MemberService，暂时模拟搜索）
+            var allMembers = _memberService.GetAllMembers();
+            var searchResults = allMembers.Where(m => 
+                m.Name.Contains(keyword) || 
+                m.PhoneNumber.Contains(keyword)
+            ).ToList();
+            
+            _lbxMemberSearchResults.Items.Clear();
+            foreach (var member in searchResults)
+            {
+                _lbxMemberSearchResults.Items.Add($"{member.Name} - {member.PhoneNumber} ({GetLevelName(member.Level)})");
+            }
+            
+            if (searchResults.Count > 0)
+            {
+                _lbxMemberSearchResults.Visible = true;
+            }
+            else
+            {
+                _lbxMemberSearchResults.Visible = false;
+                _selectedMember = null;
+                _lblMemberLevel.Text = "";  
+                CalculateAmounts();
+            }
+            
+            _isSearching = false;
+        }
+        
+        private void SelectMemberFromList()
+        {
+            if (_lbxMemberSearchResults.SelectedIndex >= 0)
+            {
+                string selectedText = _lbxMemberSearchResults.SelectedItem.ToString();
+                string keyword = _txtCustomer.Text.Trim();
+                
+                // 查找选中的会员
+                var allMembers = _memberService.GetAllMembers();
+                _selectedMember = allMembers.FirstOrDefault(m => 
+                    (m.Name.Contains(keyword) || m.PhoneNumber.Contains(keyword)) && 
+                    selectedText.Contains(m.Name) && selectedText.Contains(m.PhoneNumber)
+                );
+                
+                if (_selectedMember != null)
+                {
+                    _txtCustomer.Text = _selectedMember.Name;
+                    _lblMemberLevel.Text = $"{GetLevelName(_selectedMember.Level)}";
+                    CalculateAmounts();
+                }
+            }
+            
+            _lbxMemberSearchResults.Visible = false;
+        }
+        
+        private string GetLevelName(MemberLevel level)
+        {
+            switch (level)
+            {
+                case MemberLevel.Bronze: return "铜牌会员";
+                case MemberLevel.Silver: return "银牌会员";
+                case MemberLevel.Gold: return "金牌会员";
+                case MemberLevel.Platinum: return "铂金会员";
+                default: return "普通顾客";
+            }
         }
 
         private void UpdateButtonStates()
@@ -547,6 +690,7 @@ namespace market.Forms
                     OrderNumber = _saleService.GenerateSaleOrderNumber(),
                     OrderDate = DateTime.Now,
                     Customer = _txtCustomer.Text.Trim(),
+                    MemberId = _selectedMember?.Id,
                     OperatorId = _authService.CurrentUser.Id,
                     Status = SaleOrderStatus.Pending,
                     TotalAmount = _totalAmount,
@@ -583,13 +727,24 @@ namespace market.Forms
                     // 保存销售订单
                     if (_saleService.CreateSaleOrder(saleOrder))
                     {
+                        // 更新会员积分
+                        if (_selectedMember != null)
+                        {
+                            // 按照消费金额的1%累计积分
+                            decimal pointsToAdd = Math.Round(_finalAmount * 0.01m, 0);
+                            _memberService.UpdatePoints(_selectedMember.Id, pointsToAdd);
+                        }
+                        
                         MessageBox.Show($"销售成功！单号: {saleOrder.OrderNumber}\n实收: ￥{saleOrder.ReceivedAmount:F2}\n找零: ￥{saleOrder.ChangeAmount:F2}", 
                             "销售成功", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                        // 清空购物车
-                        _cartItems.Clear();
-                        RefreshCartDisplay();
-                        CalculateAmounts();
+                        // 清空购物车和会员信息
+                    _cartItems.Clear();
+                    _selectedMember = null;
+                    _txtCustomer.Text = "";
+                    _lblMemberLevel.Text = "";
+                    RefreshCartDisplay();
+                    CalculateAmounts();
 
                         // 询问是否打印小票
                         if (MessageBox.Show("是否打印小票？", "打印小票", 

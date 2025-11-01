@@ -11,6 +11,7 @@ namespace market.Models
         public string OrderNumber { get; set; } // 销售单号
         public DateTime OrderDate { get; set; } // 销售日期
         public string Customer { get; set; } // 顾客姓名
+        public string MemberId { get; set; } // 会员ID
         public string OperatorId { get; set; } // 操作人ID
         public string OperatorName { get; set; } // 操作人姓名
         public SaleOrderStatus Status { get; set; } // 订单状态

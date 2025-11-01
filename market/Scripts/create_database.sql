@@ -46,6 +46,67 @@ CREATE TABLE IF NOT EXISTS Orders (
     FOREIGN KEY (CashierId) REFERENCES Users(Id)
 );
 
+-- 创建会员表
+CREATE TABLE IF NOT EXISTS members (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    phone_number VARCHAR(20),
+    email VARCHAR(100),
+    registration_date DATETIME NOT NULL,
+    points DECIMAL(10,2) DEFAULT 0,
+    level INT NOT NULL DEFAULT 0
+);
+
+-- 创建销售订单表
+CREATE TABLE IF NOT EXISTS SaleOrders (
+    OrderNumber VARCHAR(50) PRIMARY KEY,
+    OrderDate DATETIME NOT NULL,
+    Customer VARCHAR(100),
+    MemberId VARCHAR(50),
+    OperatorId VARCHAR(50) NOT NULL,
+    Status INT NOT NULL,
+    TotalAmount DECIMAL(10,2) NOT NULL,
+    DiscountAmount DECIMAL(10,2) DEFAULT 0,
+    FinalAmount DECIMAL(10,2) NOT NULL,
+    ReceivedAmount DECIMAL(10,2) NOT NULL,
+    ChangeAmount DECIMAL(10,2) DEFAULT 0,
+    PaymentMethod INT NOT NULL,
+    Notes TEXT,
+    CreatedAt DATETIME NOT NULL,
+    FOREIGN KEY (OperatorId) REFERENCES Users(Id),
+    FOREIGN KEY (MemberId) REFERENCES members(id)
+);
+
+-- 创建销售订单明细表
+CREATE TABLE IF NOT EXISTS SaleOrderItems (
+    Id VARCHAR(50) PRIMARY KEY,
+    OrderNumber VARCHAR(50) NOT NULL,
+    ProductCode VARCHAR(50) NOT NULL,
+    ProductName VARCHAR(100) NOT NULL,
+    Quantity INT NOT NULL,
+    SalePrice DECIMAL(10,2) NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    OriginalPrice DECIMAL(10,2) NOT NULL,
+    DiscountRate DECIMAL(10,2) DEFAULT 0,
+    FOREIGN KEY (OrderNumber) REFERENCES SaleOrders(OrderNumber),
+    FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode)
+);
+
+-- 创建销售历史表
+CREATE TABLE IF NOT EXISTS SaleHistory (
+    Id VARCHAR(50) PRIMARY KEY,
+    ProductCode VARCHAR(50) NOT NULL,
+    Quantity INT NOT NULL,
+    SalePrice DECIMAL(10,2) NOT NULL,
+    Amount DECIMAL(10,2) NOT NULL,
+    OrderNumber VARCHAR(50) NOT NULL,
+    SaleDate DATETIME NOT NULL,
+    OperatorId VARCHAR(50) NOT NULL,
+    FOREIGN KEY (ProductCode) REFERENCES Products(ProductCode),
+    FOREIGN KEY (OrderNumber) REFERENCES SaleOrders(OrderNumber),
+    FOREIGN KEY (OperatorId) REFERENCES Users(Id)
+);
+
 -- 创建订单明细表
 CREATE TABLE IF NOT EXISTS OrderItems (
     Id INT AUTO_INCREMENT PRIMARY KEY,

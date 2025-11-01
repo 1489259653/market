@@ -50,11 +50,11 @@ namespace market.Services
                             // 插入销售订单主表
                             string orderQuery = @"
                                 INSERT INTO SaleOrders (
-                                    OrderNumber, OrderDate, Customer, OperatorId, 
+                                    OrderNumber, OrderDate, Customer, MemberId, OperatorId, 
                                     Status, TotalAmount, DiscountAmount, FinalAmount, 
                                     ReceivedAmount, ChangeAmount, PaymentMethod, Notes, CreatedAt
                                 ) VALUES (
-                                    @OrderNumber, @OrderDate, @Customer, @OperatorId,
+                                    @OrderNumber, @OrderDate, @Customer, @MemberId, @OperatorId,
                                     @Status, @TotalAmount, @DiscountAmount, @FinalAmount,
                                     @ReceivedAmount, @ChangeAmount, @PaymentMethod, @Notes, @CreatedAt
                                 )";
@@ -64,6 +64,7 @@ namespace market.Services
                                 orderCommand.Parameters.AddWithValue("@OrderNumber", order.OrderNumber);
                                 orderCommand.Parameters.AddWithValue("@OrderDate", order.OrderDate);
                                 orderCommand.Parameters.AddWithValue("@Customer", order.Customer ?? "散客");
+                                orderCommand.Parameters.AddWithValue("@MemberId", order.MemberId ?? (object)DBNull.Value);
                                 orderCommand.Parameters.AddWithValue("@OperatorId", order.OperatorId);
                                 orderCommand.Parameters.AddWithValue("@Status", (int)order.Status);
                                 orderCommand.Parameters.AddWithValue("@TotalAmount", order.TotalAmount);
