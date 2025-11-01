@@ -91,14 +91,16 @@ namespace market.Forms
                 connection.Open();
                 string query = @"
                     SELECT 
-                        DATE(OrderDate) as sale_date, 
-                        SUM(TotalAmount) as daily_sales 
+                        DATE(so.OrderDate) as sale_date, 
+                        SUM(oi.Amount) as daily_sales 
                     FROM 
-                        Orders 
+                        saleorderitems oi
+                    JOIN
+                        saleOrders so ON oi.OrderNumber = so.OrderNumber
                     WHERE 
-                        OrderDate BETWEEN @startDate AND @endDate 
+                        so.OrderDate BETWEEN @startDate AND @endDate 
                     GROUP BY 
-                        DATE(OrderDate) 
+                        DATE(so.OrderDate) 
                     ORDER BY 
                         sale_date;
                 ";
@@ -138,13 +140,13 @@ namespace market.Forms
                         p.Name as product_name, 
                         SUM(oi.Quantity) as total_quantity 
                     FROM 
-                        OrderItems oi
+                        saleorderitems oi
                     JOIN 
                         Products p ON oi.ProductCode = p.ProductCode
                     JOIN 
-                        Orders o ON oi.OrderNumber = o.OrderNumber
+                        saleOrders so ON oi.OrderNumber = so.OrderNumber
                     WHERE 
-                        o.OrderDate BETWEEN @startDate AND @endDate
+                        so.OrderDate BETWEEN @startDate AND @endDate
                     GROUP BY 
                         p.ProductCode, p.Name
                     ORDER BY 
@@ -187,15 +189,15 @@ namespace market.Forms
                 string query = @"
                     SELECT 
                         p.Category as category_name, 
-                        SUM(oi.Quantity * oi.Price) as category_sales
+                        SUM(oi.Amount) as category_sales
                     FROM 
-                        OrderItems oi
+                        saleorderitems oi
                     JOIN 
                         Products p ON oi.ProductCode = p.ProductCode
                     JOIN 
-                        Orders o ON oi.OrderNumber = o.OrderNumber
+                        saleOrders so ON oi.OrderNumber = so.OrderNumber
                     WHERE 
-                        o.OrderDate BETWEEN @startDate AND @endDate
+                        so.OrderDate BETWEEN @startDate AND @endDate
                     GROUP BY 
                         p.Category
                     ORDER BY 
@@ -249,10 +251,10 @@ namespace market.Forms
                     FROM 
                         Products p
                     LEFT JOIN 
-                        OrderItems oi ON p.ProductCode = oi.ProductCode
+                        saleorderitems oi ON p.ProductCode = oi.ProductCode
                     LEFT JOIN 
-                        Orders o ON oi.OrderNumber = o.OrderNumber
-                        AND o.OrderDate BETWEEN @startDate AND @endDate
+                        saleOrders so ON oi.OrderNumber = so.OrderNumber
+                        AND so.OrderDate BETWEEN @startDate AND @endDate
                     WHERE 
                         p.Quantity > 0
                     GROUP BY 
@@ -295,8 +297,9 @@ namespace market.Forms
                 
                 // 统计总销售额
                 string salesQuery = @"
-                    SELECT SUM(TotalAmount) FROM Orders 
-                    WHERE OrderDate BETWEEN @startDate AND @endDate;
+                    SELECT SUM(oi.Amount) FROM saleorderitems oi
+                    JOIN saleOrders so ON oi.OrderNumber = so.OrderNumber
+                    WHERE so.OrderDate BETWEEN @startDate AND @endDate;
                 ";
                 using (var command = new MySqlCommand(salesQuery, connection))
                 {
@@ -310,7 +313,7 @@ namespace market.Forms
                 
                 // 统计订单数量
                 string orderQuery = @"
-                    SELECT COUNT(*) FROM Orders 
+                    SELECT COUNT(*) FROM saleOrders 
                     WHERE OrderDate BETWEEN @startDate AND @endDate;
                 ";
                 using (var command = new MySqlCommand(orderQuery, connection))
@@ -324,9 +327,9 @@ namespace market.Forms
                 
                 // 统计销售商品种类
                 string productQuery = @"
-                    SELECT COUNT(DISTINCT oi.ProductCode) FROM OrderItems oi
-                    JOIN Orders o ON oi.OrderNumber = o.OrderNumber
-                    WHERE o.OrderDate BETWEEN @startDate AND @endDate;
+                    SELECT COUNT(DISTINCT oi.ProductCode) FROM saleorderitems oi
+                    JOIN saleOrders so ON oi.OrderNumber = so.OrderNumber
+                    WHERE so.OrderDate BETWEEN @startDate AND @endDate;
                 ";
                 using (var command = new MySqlCommand(productQuery, connection))
                 {
