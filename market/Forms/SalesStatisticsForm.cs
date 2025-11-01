@@ -427,21 +427,37 @@ namespace market.Forms
         private void CreateCategoryDistributionSheet(ExcelPackage package)
         {
             var worksheet = package.Workbook.Worksheets.Add("类别分布");
-            worksheet.Cells["A1"].Value = "类别名称";
-            worksheet.Cells["B1"].Value = "销售额";
-            worksheet.Cells["C1"].Value = "占比";
             
-            int row = 2;
+            // 直接准备饼图所需的数据，不显示表格
+            int row = 1;
             foreach (DataRow dr in categoryDistributionData.Rows)
             {
                 worksheet.Cells[$"A{row}"].Value = dr["类别名称"];
                 worksheet.Cells[$"B{row}"].Value = dr["销售额"];
-                worksheet.Cells[$"C{row}"].Value = dr["占比"];
                 row++;
             }
             
-            worksheet.Column(1).AutoFit();
-            worksheet.Column(2).Style.Numberformat.Format = "¥#,##0.00";
+            // 隐藏数据列，只显示饼图
+            worksheet.Column(1).Hidden = true;
+            worksheet.Column(2).Hidden = true;
+            
+            // 创建饼图（使用EPPlus 7.x API）
+            var pieChart = worksheet.Drawings.AddChart("类别分布饼图", OfficeOpenXml.Drawing.Chart.eChartType.Pie);
+            
+            // 设置图表标题
+            pieChart.Title.Text = "销售类别分布";
+            
+            // 设置图表位置和大小
+            pieChart.SetPosition(0, 0, 0, 0);
+            pieChart.SetSize(600, 400);
+            
+            // 添加数据系列
+            var dataRange = worksheet.Cells[$"B1:B{row-1}"];
+            var categoriesRange = worksheet.Cells[$"A1:A{row-1}"];
+            var series = pieChart.Series.Add(dataRange, categoriesRange);
+            
+            // 设置图例位置
+            pieChart.Legend.Position = OfficeOpenXml.Drawing.Chart.eLegendPosition.Bottom;
         }
 
         private void CreateSlowMovingSheet(ExcelPackage package)
