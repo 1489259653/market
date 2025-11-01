@@ -27,7 +27,7 @@ namespace market.Forms
         }
 
         private void LoadMembers()
-        {
+        {            
             dgvMembers.Rows.Clear();
             var members = _memberService.GetAllMembers();
             foreach (var member in members)
@@ -39,7 +39,8 @@ namespace market.Forms
                     member.Email,
                     member.RegistrationDate.ToString("yyyy-MM-dd"),
                     member.Points,
-                    member.Level.ToString()
+                    member.Level.ToString(),
+                    (member.Discount * 10).ToString("0.#") + "折"
                 );
             }
         }
@@ -60,16 +61,18 @@ namespace market.Forms
             }
 
             try
-            {
+            {                
+                var selectedLevel = (MemberLevel)cmbLevel.SelectedItem;
                 var member = new Member
-                {
+                {                    
                     Id = Guid.NewGuid().ToString(),
                     Name = txtName.Text,
                     PhoneNumber = txtPhone.Text,
                     Email = txtEmail.Text,
                     RegistrationDate = DateTime.Now,
                     Points = 0,
-                    Level = MemberLevel.Bronze
+                    Level = selectedLevel,
+                    Discount = GetDiscountByLevel(selectedLevel) // 根据等级设置默认折扣
                 };
 
                 _memberService.AddMember(member);
@@ -101,7 +104,8 @@ namespace market.Forms
                     Email = txtEmail.Text,
                     RegistrationDate = Convert.ToDateTime(dtpRegistrationDate.Value),
                     Points = Convert.ToDecimal(txtPoints.Text),
-                    Level = (MemberLevel)cmbLevel.SelectedItem
+                    Level = (MemberLevel)cmbLevel.SelectedItem,
+                    Discount = Convert.ToDecimal(txtDiscount.Text)
                 };
 
                 _memberService.UpdateMember(member);
@@ -139,9 +143,9 @@ namespace market.Forms
         }
 
         private void dgvMembers_CellClick(object sender, DataGridViewCellEventArgs e)
-        {
+        {            
             if (e.RowIndex >= 0)
-            {
+            {                
                 var row = dgvMembers.Rows[e.RowIndex];
                 txtId.Text = row.Cells["Id"].Value.ToString();
                 txtName.Text = row.Cells["Name"].Value.ToString();
@@ -150,6 +154,14 @@ namespace market.Forms
                 dtpRegistrationDate.Value = Convert.ToDateTime(row.Cells["RegistrationDate"].Value);
                 txtPoints.Text = row.Cells["Points"].Value.ToString();
                 cmbLevel.SelectedItem = Enum.Parse(typeof(MemberLevel), row.Cells["Level"].Value.ToString());
+                
+                // 从表格中的折扣字符串解析回折扣率
+                string discountText = row.Cells["Discount"].Value.ToString();
+                if (discountText.EndsWith("折"))
+                {
+                    discountText = discountText.Substring(0, discountText.Length - 1);
+                    txtDiscount.Text = (Convert.ToDecimal(discountText) / 10).ToString("0.##");
+                }
             }
         }
 
@@ -159,7 +171,7 @@ namespace market.Forms
         }
 
         private void ClearInputs()
-        {
+        {            
             txtId.Text = string.Empty;
             txtName.Text = string.Empty;
             txtPhone.Text = string.Empty;
@@ -167,6 +179,26 @@ namespace market.Forms
             dtpRegistrationDate.Value = DateTime.Now;
             txtPoints.Text = "0";
             cmbLevel.SelectedItem = MemberLevel.Bronze;
+            txtDiscount.Text = GetDiscountByLevel(MemberLevel.Bronze).ToString("0.##");
+        }
+        
+        private decimal GetDiscountByLevel(MemberLevel level)
+        {
+            switch (level)
+            {
+                case MemberLevel.Bronze: return 0.99m; // 99折
+                case MemberLevel.Silver: return 0.90m;  // 9折
+                case MemberLevel.Gold: return 0.85m;    // 85折
+                case MemberLevel.Platinum: return 0.75m; // 75折
+                default: return 1.0m;                   // 无折扣
+            }
+        }
+        
+        private void cmbLevel_SelectedIndexChanged(object sender, EventArgs e)
+        {            
+            // 无论新增还是编辑会员，当选择不同等级时自动更新折扣
+            var selectedLevel = (MemberLevel)cmbLevel.SelectedItem;
+            txtDiscount.Text = GetDiscountByLevel(selectedLevel).ToString("0.##");
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -193,10 +225,12 @@ namespace market.Forms
                 }
             }
             else
-            {
+            {                
                 LoadMembers();
             }
         }
+        
+
 
         private void btnResetSearch_Click(object sender, EventArgs e)
         {
@@ -215,17 +249,20 @@ namespace market.Forms
             this.RegistrationDate = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Points = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Level = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Discount = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.label2 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.label4 = new System.Windows.Forms.Label();
             this.label5 = new System.Windows.Forms.Label();
             this.label6 = new System.Windows.Forms.Label();
             this.label7 = new System.Windows.Forms.Label();
+            this.label9 = new System.Windows.Forms.Label();
             this.txtId = new System.Windows.Forms.TextBox();
             this.txtName = new System.Windows.Forms.TextBox();
             this.txtPhone = new System.Windows.Forms.TextBox();
             this.txtEmail = new System.Windows.Forms.TextBox();
             this.txtPoints = new System.Windows.Forms.TextBox();
+            this.txtDiscount = new System.Windows.Forms.TextBox();
             this.cmbLevel = new System.Windows.Forms.ComboBox();
             this.dtpRegistrationDate = new System.Windows.Forms.DateTimePicker();
             this.btnAddMember = new System.Windows.Forms.Button();
@@ -238,6 +275,15 @@ namespace market.Forms
             this.btnResetSearch = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.dgvMembers)).BeginInit();
             this.SuspendLayout();
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Location = new System.Drawing.Point(385, 374);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(53, 12);
+            this.label9.TabIndex = 23;
+            this.label9.Text = "折扣率：";
             // 
             // label1
             // 
@@ -259,7 +305,8 @@ namespace market.Forms
             this.Email,
             this.RegistrationDate,
             this.Points,
-            this.Level});
+            this.Level,
+            this.Discount});
             this.dgvMembers.Location = new System.Drawing.Point(12, 45);
             this.dgvMembers.Name = "dgvMembers";
             this.dgvMembers.RowTemplate.Height = 23;
@@ -308,6 +355,12 @@ namespace market.Forms
             this.Level.HeaderText = "会员等级";
             this.Level.Name = "Level";
             this.Level.Width = 80;
+            // 
+            // Discount
+            // 
+            this.Discount.HeaderText = "折扣";
+            this.Discount.Name = "Discount";
+            this.Discount.Width = 60;
             // 
             // label2
             // 
@@ -363,6 +416,15 @@ namespace market.Forms
             this.label7.TabIndex = 7;
             this.label7.Text = "积分：";
             // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Location = new System.Drawing.Point(385, 374);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(53, 12);
+            this.label9.TabIndex = 8;
+            this.label9.Text = "折扣率：";
+            // 
             // txtId
             // 
             this.txtId.Location = new System.Drawing.Point(71, 311);
@@ -399,6 +461,13 @@ namespace market.Forms
             this.txtPoints.Size = new System.Drawing.Size(120, 21);
             this.txtPoints.TabIndex = 12;
             // 
+            // txtDiscount
+            // 
+            this.txtDiscount.Location = new System.Drawing.Point(444, 371);
+            this.txtDiscount.Name = "txtDiscount";
+            this.txtDiscount.Size = new System.Drawing.Size(120, 21);
+            this.txtDiscount.TabIndex = 24;
+            // 
             // cmbLevel
             // 
             this.cmbLevel.FormattingEnabled = true;
@@ -406,6 +475,7 @@ namespace market.Forms
             this.cmbLevel.Name = "cmbLevel";
             this.cmbLevel.Size = new System.Drawing.Size(120, 20);
             this.cmbLevel.TabIndex = 13;
+            this.cmbLevel.SelectedIndexChanged += new System.EventHandler(this.cmbLevel_SelectedIndexChanged);
             // 
             // dtpRegistrationDate
             // 
@@ -535,6 +605,9 @@ namespace market.Forms
         private System.Windows.Forms.DataGridViewTextBoxColumn RegistrationDate;
         private System.Windows.Forms.DataGridViewTextBoxColumn Points;
         private System.Windows.Forms.DataGridViewTextBoxColumn Level;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Discount;
+        private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.TextBox txtDiscount;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Label label4;

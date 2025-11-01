@@ -12,6 +12,7 @@ namespace market.Models
         public DateTime RegistrationDate { get; set; } // 注册时间
         public decimal Points { get; set; } // 积分
         public MemberLevel Level { get; set; } // 会员等级
+        public decimal Discount { get; set; } // 折扣率（例如0.98表示98折）
     }
 
     /// <summary>

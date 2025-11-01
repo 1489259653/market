@@ -553,7 +553,7 @@ namespace market.Forms
             // 根据会员等级计算折扣
             if (_selectedMember != null)
             {
-                _discountAmount = CalculateMemberDiscount(_totalAmount, _selectedMember.Level);
+                _discountAmount = CalculateMemberDiscount(_totalAmount, _selectedMember.Discount);
             }
             else
             {
@@ -567,22 +567,12 @@ namespace market.Forms
             _lblFinalAmount.Text = $"￥{_finalAmount:F2}";
         }
         
-        private decimal CalculateMemberDiscount(decimal amount, MemberLevel level)
+        private decimal CalculateMemberDiscount(decimal amount, decimal discount)
         {
-            // 根据会员等级设置折扣率
-            switch (level)
-            {
-                case MemberLevel.Bronze: // 铜牌会员 98折
-                    return amount * 0.02m;
-                case MemberLevel.Silver: // 银牌会员 95折
-                    return amount * 0.05m;
-                case MemberLevel.Gold: // 金牌会员 9折
-                    return amount * 0.1m;
-                case MemberLevel.Platinum: // 铂金会员 85折
-                    return amount * 0.15m;
-                default:
-                    return 0;
-            }
+            // 使用会员的折扣率计算折扣金额
+            // discount为折扣率，如0.98表示98折
+            // 折扣金额 = 原价 × (1 - 折扣率)
+            return amount * (1 - discount);
         }
         
         private void SearchMember()
@@ -603,12 +593,8 @@ namespace market.Forms
                 return;
             }
             
-            // 搜索会员（这里需要扩展MemberService，暂时模拟搜索）
-            var allMembers = _memberService.GetAllMembers();
-            var searchResults = allMembers.Where(m => 
-                m.Name.Contains(keyword) || 
-                m.PhoneNumber.Contains(keyword)
-            ).ToList();
+            // 使用数据库搜索功能查找会员
+            var searchResults = _memberService.SearchMembers(keyword);
             
             _lbxMemberSearchResults.Items.Clear();
             foreach (var member in searchResults)
@@ -1151,10 +1137,20 @@ namespace market.Forms
                 }
                 
                 // 使用_lastFrame的副本进行UI更新
-                SafeUpdateCameraImage(new Bitmap(_lastFrame));
-                
-                // 处理摄像头帧（可用于添加图像处理逻辑）
-                ProcessCameraFrame(new Bitmap(_lastFrame));
+                if (_lastFrame != null)
+                {
+                    // 创建新的位图副本用于UI显示
+                    using (var displayBitmap = new Bitmap(_lastFrame))
+                    {
+                        SafeUpdateCameraImage(new Bitmap(displayBitmap));
+                    }
+                    
+                    // 处理摄像头帧（可用于添加图像处理逻辑）
+                    using (var processBitmap = new Bitmap(_lastFrame))
+                    {
+                        ProcessCameraFrame(processBitmap);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1170,56 +1166,81 @@ namespace market.Forms
         {
             try
             {
-                if (_cameraPictureBox == null || this.IsDisposed)
+                if (_cameraPictureBox == null || this.IsDisposed || _cameraPictureBox.IsDisposed)
                 {
                     newImage?.Dispose();
                     return;
                 }
                 
-                // 释放旧图像资源
-                if (_cameraPictureBox.Image != null)
-                {
-                    try
-                    {
-                        _cameraPictureBox.Image.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"释放旧图像失败: {ex.Message}");
-                    }
-                }
+                Bitmap imageToDisplay = null;
                 
-                // 对图像进行水平翻转（镜像）处理
-                if (newImage != null)
+                try
                 {
-                    using (Graphics g = Graphics.FromImage(newImage))
+                    // 对图像进行水平翻转（镜像）处理
+                    if (newImage != null)
                     {
-                        // 保存当前状态并获取状态对象
-                        GraphicsState state = g.Save();
+                        // 创建新的位图用于镜像处理
+                        imageToDisplay = new Bitmap(newImage.Width, newImage.Height);
                         
-                        // 设置变换矩阵 - 水平翻转
-                        g.ScaleTransform(-1.0f, 1.0f);
-                        
-                        // 创建临时图像用于绘制
-                        using (Bitmap tempImage = new Bitmap(newImage.Width, newImage.Height))
+                        using (Graphics g = Graphics.FromImage(imageToDisplay))
                         {
-                            // 将原始图像内容复制到临时图像
-                            using (Graphics tempG = Graphics.FromImage(tempImage))
-                            {
-                                tempG.DrawImageUnscaled(newImage, 0, 0);
-                            }
+                            // 水平翻转
+                            g.ScaleTransform(-1.0f, 1.0f);
+                            g.TranslateTransform(-newImage.Width, 0);
                             
-                            // 以镜像方式绘制回原始图像
-                            g.DrawImage(tempImage, -newImage.Width, 0);
+                            // 绘制原图像
+                            g.DrawImage(newImage, 0, 0, newImage.Width, newImage.Height);
                         }
                         
-                        // 恢复图形状态
-                        g.Restore(state);
+                        // 释放原始图像
+                        newImage.Dispose();
+                    }
+                    
+                    // 安全的UI更新
+                    if (_cameraPictureBox.InvokeRequired)
+                    {
+                        _cameraPictureBox.Invoke(new Action(() => 
+                        {
+                            if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                            {
+                                // 释放旧图像
+                                if (_cameraPictureBox.Image != null)
+                                {
+                                    var oldImage = _cameraPictureBox.Image;
+                                    _cameraPictureBox.Image = null;
+                                    oldImage.Dispose();
+                                }
+                                
+                                // 设置新图像
+                                _cameraPictureBox.Image = imageToDisplay;
+                                imageToDisplay = null; // 图像所有权已转移
+                            }
+                        }));
+                    }
+                    else
+                    {
+                        if (_cameraPictureBox != null && !_cameraPictureBox.IsDisposed)
+                        {
+                            // 释放旧图像
+                            if (_cameraPictureBox.Image != null)
+                            {
+                                var oldImage = _cameraPictureBox.Image;
+                                _cameraPictureBox.Image = null;
+                                oldImage.Dispose();
+                            }
+                            
+                            // 设置新图像
+                            _cameraPictureBox.Image = imageToDisplay;
+                            imageToDisplay = null; // 图像所有权已转移
+                        }
                     }
                 }
-                
-                // 设置镜像后的图像
-                _cameraPictureBox.Image = newImage;
+                finally
+                {
+                    // 确保未使用的图像资源被释放
+                    imageToDisplay?.Dispose();
+                    newImage?.Dispose();
+                }
             }
             catch (Exception ex)
             {

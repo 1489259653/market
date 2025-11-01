@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS members (
     email VARCHAR(100),
     registration_date DATETIME NOT NULL,
     points DECIMAL(10,2) DEFAULT 0,
-    level INT NOT NULL DEFAULT 0
+    level INT NOT NULL DEFAULT 0,
+    discount DECIMAL(5,2) NOT NULL DEFAULT 1.00
 );
 
 -- 创建销售订单表

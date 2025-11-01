@@ -437,7 +437,7 @@ namespace market.Forms
                 var saleService = new SaleService(_databaseService, _authService);
                 var memberService = new MemberService(_databaseService);
                 var saleForm = new SaleCounterForm(saleService, _authService, memberService);
-                saleForm.ShowDialog();
+                saleForm.ShowDialog(this);
             }
             catch (Exception ex)
             {
