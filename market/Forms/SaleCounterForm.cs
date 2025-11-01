@@ -26,6 +26,7 @@ namespace market.Forms
         private List<CartItem> _cartItems = new List<CartItem>();
         private decimal _totalAmount = 0;
         private decimal _discountAmount = 0;
+        private decimal _pointsDiscountAmount = 0; // 积分抵扣金额
         private decimal _finalAmount = 0;
 
         // UI控件
@@ -574,12 +575,14 @@ namespace market.Forms
             else
             {
                 _discountAmount = 0;
+                _pointsDiscountAmount = 0; // 非会员不使用积分抵扣
             }
             
-            _finalAmount = _totalAmount - _discountAmount;
+            // 计算最终金额（总金额 - 会员折扣 - 积分抵扣）
+            _finalAmount = Math.Max(0, _totalAmount - _discountAmount - _pointsDiscountAmount);
 
             _lblTotalAmount.Text = $"￥{_totalAmount:F2}";
-            _lblDiscountAmount.Text = $"￥{_discountAmount:F2}";
+            _lblDiscountAmount.Text = $"￥{_discountAmount:F2}{(_pointsDiscountAmount > 0 ? $" (含积分抵扣￥{_pointsDiscountAmount:F2})" : "")}";
             _lblFinalAmount.Text = $"￥{_finalAmount:F2}";
         }
         
@@ -650,7 +653,27 @@ namespace market.Forms
                 if (_selectedMember != null)
                 {
                     _txtCustomer.Text = _selectedMember.Name;
-                    _lblMemberLevel.Text = $"{GetLevelName(_selectedMember.Level)}";
+                    _lblMemberLevel.Text = $"{GetLevelName(_selectedMember.Level)} | 积分:{_selectedMember.Points} | 累计消费:{_selectedMember.TotalSpending:C2}";
+                    
+                    // 询问是否使用积分抵扣
+                    if (_selectedMember.Points > 0 && _totalAmount > 0)
+                    {
+                        DialogResult result = MessageBox.Show($"当前有 {_selectedMember.Points} 积分，是否使用积分抵扣？\n100积分 = 1元", 
+                            "积分抵扣", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                        
+                        if (result == DialogResult.Yes)
+                        {
+                            decimal maxDeductPoints = Math.Min(_selectedMember.Points, Math.Floor(_totalAmount * 100));
+                            string input = Microsoft.VisualBasic.Interaction.InputBox("请输入要使用的积分数量:\n(100积分 = 1元，最多可使用" + maxDeductPoints + "积分)", 
+                                "积分抵扣", maxDeductPoints.ToString(), -1, -1);
+                            
+                            if (!string.IsNullOrEmpty(input) && decimal.TryParse(input, out decimal pointsToUse) && pointsToUse > 0 && pointsToUse <= maxDeductPoints)
+                            {
+                                // 计算积分抵扣金额（100积分 = 1元）
+                                _pointsDiscountAmount = pointsToUse / 100;
+                            }
+                        }
+                    }
                     
                     // 重新计算所有购物车商品的折扣
                     CalculateAmounts();
@@ -731,12 +754,22 @@ namespace market.Forms
                     // 保存销售订单
                     if (_saleService.CreateSaleOrder(saleOrder))
                     {
-                        // 更新会员积分
+                        // 更新会员积分和累积消费金额
                         if (_selectedMember != null)
                         {
-                            // 按照消费金额的1%累计积分
+                            // 1. 使用积分抵扣
+                            if (_pointsDiscountAmount > 0)
+                            {
+                                decimal pointsToDeduct = _pointsDiscountAmount * 100; // 1元 = 100积分
+                                _memberService.DeductPoints(_selectedMember.Id, pointsToDeduct);
+                            }
+                            
+                            // 2. 按照消费金额的1%累计积分（基于实际支付金额）
                             decimal pointsToAdd = Math.Round(_finalAmount * 0.01m, 0);
                             _memberService.UpdatePoints(_selectedMember.Id, pointsToAdd);
+                            
+                            // 3. 更新累积消费金额（使用实际支付金额）
+                            _memberService.UpdateTotalSpending(_selectedMember.Id, _finalAmount);
                         }
                         
                         MessageBox.Show($"销售成功！单号: {saleOrder.OrderNumber}\n实收: ￥{saleOrder.ReceivedAmount:F2}\n找零: ￥{saleOrder.ChangeAmount:F2}", 
@@ -747,6 +780,7 @@ namespace market.Forms
                     _selectedMember = null;
                     _txtCustomer.Text = "";
                     _lblMemberLevel.Text = "";
+                    _pointsDiscountAmount = 0; // 重置积分抵扣金额
                     RefreshCartDisplay();
                     CalculateAmounts();
 

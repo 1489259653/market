@@ -13,6 +13,7 @@ namespace market.Models
         public decimal Points { get; set; } // 积分
         public MemberLevel Level { get; set; } // 会员等级
         public decimal Discount { get; set; } // 折扣率（例如0.98表示98折）
+        public decimal TotalSpending { get; set; } // 累积消费金额
     }
 
     /// <summary>

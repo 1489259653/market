@@ -32,7 +32,8 @@ namespace market.Services
                                 registration_date DATETIME NOT NULL,
                                 points DECIMAL(10,2) DEFAULT 0,
                                 level INT NOT NULL DEFAULT 0,
-                                discount DECIMAL(5,2) NOT NULL DEFAULT 1.00
+                                discount DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+                                total_spending DECIMAL(15,2) DEFAULT 0
                               )";
                 using (var cmd = new MySqlCommand(sql, connection))
                 {
@@ -41,6 +42,13 @@ namespace market.Services
                 
                 // 如果表已存在但缺少discount字段，则添加该字段
                 sql = @"ALTER TABLE members ADD COLUMN IF NOT EXISTS discount DECIMAL(5,2) NOT NULL DEFAULT 1.00";
+                using (var cmd = new MySqlCommand(sql, connection))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                
+                // 如果表已存在但缺少total_spending字段，则添加该字段
+                sql = @"ALTER TABLE members ADD COLUMN IF NOT EXISTS total_spending DECIMAL(15,2) NOT NULL DEFAULT 0";
                 using (var cmd = new MySqlCommand(sql, connection))
                 {
                     cmd.ExecuteNonQuery();
@@ -93,7 +101,7 @@ namespace market.Services
             {
                 connection.Open();
                 string sql = @"UPDATE members SET name = @Name, phone_number = @PhoneNumber, email = @Email, 
-                              points = @Points, level = @Level, discount = @Discount WHERE id = @Id";
+                              points = @Points, level = @Level, discount = @Discount, total_spending = @TotalSpending WHERE id = @Id";
                 using (var cmd = new MySqlCommand(sql, connection))
                 {
                     cmd.Parameters.AddWithValue("@Id", member.Id);
@@ -103,6 +111,7 @@ namespace market.Services
                     cmd.Parameters.AddWithValue("@Points", member.Points);
                     cmd.Parameters.AddWithValue("@Level", (int)member.Level);
                     cmd.Parameters.AddWithValue("@Discount", member.Discount);
+                    cmd.Parameters.AddWithValue("@TotalSpending", member.TotalSpending);
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -150,7 +159,8 @@ namespace market.Services
                                 RegistrationDate = Convert.ToDateTime(reader["registration_date"]),
                                 Points = Convert.ToDecimal(reader["points"]),
                                 Level = (MemberLevel)Convert.ToInt32(reader["level"]),
-                                Discount = Convert.ToDecimal(reader["discount"])
+                                Discount = Convert.ToDecimal(reader["discount"]),
+                                TotalSpending = Convert.ToDecimal(reader["total_spending"])
                             };
                         }
                     }
@@ -184,7 +194,8 @@ namespace market.Services
                                 RegistrationDate = Convert.ToDateTime(reader["registration_date"]),
                                 Points = Convert.ToDecimal(reader["points"]),
                                 Level = (MemberLevel)Convert.ToInt32(reader["level"]),
-                                Discount = Convert.ToDecimal(reader["discount"])
+                                Discount = Convert.ToDecimal(reader["discount"]),
+                                TotalSpending = Convert.ToDecimal(reader["total_spending"])
                             });
                         }
                     }
@@ -218,7 +229,8 @@ namespace market.Services
                                 RegistrationDate = Convert.ToDateTime(reader["registration_date"]),
                                 Points = Convert.ToDecimal(reader["points"]),
                                 Level = (MemberLevel)Convert.ToInt32(reader["level"]),
-                                Discount = Convert.ToDecimal(reader["discount"])
+                                Discount = Convert.ToDecimal(reader["discount"]),
+                                TotalSpending = Convert.ToDecimal(reader["total_spending"])
                             };
                         }
                     }
@@ -249,22 +261,77 @@ namespace market.Services
         }
 
         /// <summary>
+        /// 更新会员累积消费金额
+        /// </summary>
+        public void UpdateTotalSpending(string memberId, decimal amount)
+        {
+            using (var connection = _databaseService.GetConnection())
+            {
+                connection.Open();
+                string sql = "UPDATE members SET total_spending = total_spending + @Amount WHERE id = @MemberId";
+                using (var cmd = new MySqlCommand(sql, connection))
+                {
+                    cmd.Parameters.AddWithValue("@MemberId", memberId);
+                    cmd.Parameters.AddWithValue("@Amount", amount);
+                    cmd.ExecuteNonQuery();
+                }
+                
+                // 更新会员等级
+                UpdateMemberLevel(memberId);
+            }
+        }
+        
+        /// <summary>
+        /// 扣减会员积分
+        /// </summary>
+        public bool DeductPoints(string memberId, decimal pointsToDeduct)
+        {
+            using (var connection = _databaseService.GetConnection())
+            {
+                connection.Open();
+                
+                // 先检查积分是否足够
+                string checkSql = "SELECT points FROM members WHERE id = @MemberId";
+                using (var checkCmd = new MySqlCommand(checkSql, connection))
+                {
+                    checkCmd.Parameters.AddWithValue("@MemberId", memberId);
+                    decimal currentPoints = Convert.ToDecimal(checkCmd.ExecuteScalar());
+                    
+                    if (currentPoints < pointsToDeduct)
+                    {
+                        return false; // 积分不足
+                    }
+                }
+                
+                // 扣减积分
+                string deductSql = "UPDATE members SET points = points - @PointsToDeduct WHERE id = @MemberId";
+                using (var deductCmd = new MySqlCommand(deductSql, connection))
+                {
+                    deductCmd.Parameters.AddWithValue("@MemberId", memberId);
+                    deductCmd.Parameters.AddWithValue("@PointsToDeduct", pointsToDeduct);
+                    deductCmd.ExecuteNonQuery();
+                }
+            }
+            return true;
+        }
+        
+        /// <summary>
         /// 更新会员等级和折扣率
         /// </summary>
         private void UpdateMemberLevel(string memberId)
         {
-            // 根据积分更新等级和折扣率：0-1000铜，1001-3000银，3001-5000金，5000+铂金
+            // 根据累积消费金额更新等级和折扣率：0-1000铜，1001-3000银，3001-5000金，5000+铂金
             string sql = @"UPDATE members SET 
                           level = CASE 
-                              WHEN points >= 5000 THEN 3
-                              WHEN points >= 3000 THEN 2
-                              WHEN points >= 1000 THEN 1
+                              WHEN total_spending >= 5000 THEN 3
+                              WHEN total_spending >= 3000 THEN 2
+                              WHEN total_spending >= 1000 THEN 1
                               ELSE 0
                           END,
                           discount = CASE
-                              WHEN points >= 5000 THEN 0.85  -- 铂金会员 85折
-                              WHEN points >= 3000 THEN 0.90  -- 金牌会员 9折
-                              WHEN points >= 1000 THEN 0.95  -- 银牌会员 95折
+                              WHEN total_spending >= 5000 THEN 0.85  -- 铂金会员 85折
+                              WHEN total_spending >= 3000 THEN 0.90  -- 金牌会员 9折
+                              WHEN total_spending >= 1000 THEN 0.95  -- 银牌会员 95折
                               ELSE 0.98  -- 铜牌会员 98折
                           END
                           WHERE id = @MemberId";
@@ -326,7 +393,8 @@ namespace market.Services
                                 RegistrationDate = Convert.ToDateTime(reader["registration_date"]),
                                 Points = Convert.ToDecimal(reader["points"]),
                                 Level = (MemberLevel)Convert.ToInt32(reader["level"]),
-                                Discount = Convert.ToDecimal(reader["discount"])
+                                Discount = Convert.ToDecimal(reader["discount"]),
+                                TotalSpending = Convert.ToDecimal(reader["total_spending"])
                             });
                         }
                     }
